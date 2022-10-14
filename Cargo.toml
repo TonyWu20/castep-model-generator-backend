@@ -1,5 +1,5 @@
 [package]
-name = "castep_model_generator_backend"
+name = "Castep_model_generator_backend"
 version = "0.1.0"
 edition = "2021"
 
