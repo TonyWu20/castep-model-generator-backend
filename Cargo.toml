@@ -20,11 +20,11 @@ keywords = [
 
 [dependencies]
 regex = "1"
-nalgebra = "*"
+nalgebra = "0.*"
 periodic_table = "0.3.2"
 periodic-table-on-an-enum = "0.3.2"
 indicatif = "0"
 serde_yaml = "0.8.*"
-serde = { version = "*", features = ["derive"] }
-rayon = "*"
+serde = { version = "1.*", features = ["derive"] }
+rayon = "1.*"
 glob = "0"
