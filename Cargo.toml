@@ -10,7 +10,7 @@ license = "MIT"
 keywords = [
     "chemistry",
     "CASTEP",
-    "computational_chemistry",
+    "computational_chem",
     "linear_algebra",
     "model_generator",
 ]
