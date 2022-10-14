@@ -1,7 +1,20 @@
 [package]
-name = "Castep_model_generator_backend"
+name = "castep_model_generator_backend"
+description = "A rust-written backend lib for edit and generation of lattice 3D-models compatible with CASTEP and Materials Studio."
+readme = "README.md"
+homepage = "https://github.com/TonyWu20/castep-model-generator-backend"
+repository = "https://github.com/TonyWu20/castep-model-generator-backend"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+keywords = [
+    "chemistry",
+    "CASTEP",
+    "computational_chemistry",
+    "linear_algebra",
+    "model_generator",
+]
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
