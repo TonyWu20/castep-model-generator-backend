@@ -24,6 +24,7 @@ pub struct ElmTab {
 impl YamlTable for ElmTab {
     type Table = ElmTab;
     type TableItem = Element;
+    type HashKey = String;
     fn load_table<P: AsRef<Path>>(filepath: P) -> Result<Self::Table, Box<dyn std::error::Error>> {
         let yaml_table = fs::File::open(filepath)?;
         let table: ElmTab = serde_yaml::from_reader(yaml_table)?;

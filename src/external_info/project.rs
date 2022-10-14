@@ -7,6 +7,8 @@ use std::{collections::HashMap, error::Error, fs, path::Path};
 
 use serde::{Deserialize, Serialize};
 
+use super::YamlTable;
+
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct ProjectInfo {
     base_model_loc: String,
@@ -92,4 +94,26 @@ pub fn load_project_info<P: AsRef<Path>>(filepath: P) -> Result<ProjectInfo, Box
     let project_yaml = fs::File::open(filepath)?;
     let project_table = serde_yaml::from_reader(project_yaml)?;
     Ok(project_table)
+}
+
+impl YamlTable for ProjectInfo {
+    type Table = ProjectInfo;
+
+    type TableItem = String;
+
+    type HashKey = u32;
+
+    fn load_table<P: AsRef<Path>>(filepath: P) -> Result<Self::Table, Box<dyn Error>> {
+        let project_yaml = fs::File::open(filepath)?;
+        let project_table = serde_yaml::from_reader(project_yaml)?;
+        Ok(project_table)
+    }
+    /// HashMap for `atom_id: name`
+    fn hash_table(&self) -> Result<HashMap<Self::HashKey, Self::TableItem>, Box<dyn Error>> {
+        let mut hash_tab: HashMap<u32, String> = HashMap::new();
+        self.coord_sites().iter().for_each(|coord_site| {
+            hash_tab.insert(coord_site.atom_id, coord_site.name.to_string());
+        });
+        Ok(hash_tab)
+    }
 }

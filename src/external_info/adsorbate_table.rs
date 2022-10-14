@@ -101,6 +101,8 @@ impl YamlTable for AdsTab {
 
     type TableItem = AdsInfo;
 
+    type HashKey = String;
+
     fn load_table<P: AsRef<Path>>(filepath: P) -> Result<Self::Table, Box<dyn Error>> {
         let ads_table_src = fs::File::open(filepath)?;
         let ads_table = serde_yaml::from_reader(ads_table_src)?;

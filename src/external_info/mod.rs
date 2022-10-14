@@ -5,11 +5,18 @@ pub mod adsorbate_table;
 pub mod element_table;
 pub mod project;
 
+/// Trait for adsorbate and element yaml table.
 pub trait YamlTable {
+    /// Table itself.
     type Table;
+    /// Type inside the vec<>
     type TableItem;
+    /// Type for the key in `HashMap`
+    type HashKey;
+    /// Load table from given path.
     fn load_table<P: AsRef<Path>>(filepath: P) -> Result<Self::Table, Box<dyn Error>>;
-    fn hash_table(&self) -> Result<HashMap<String, Self::TableItem>, Box<dyn Error>>;
+    /// Hash table item, key type: String
+    fn hash_table(&self) -> Result<HashMap<Self::HashKey, Self::TableItem>, Box<dyn Error>>;
 }
 
 #[test]
