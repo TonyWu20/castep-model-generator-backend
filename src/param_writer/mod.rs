@@ -9,7 +9,7 @@ use std::{
 
 use crate::{cell::CellOutput, external_info::element_table::Element};
 
-trait ParamWriter: CellOutput {
+pub trait ParamWriter: CellOutput {
     fn generate_all_seed_files<P: AsRef<Path>>(
         element_tab_loc: P,
         target_root_dir: &str,
