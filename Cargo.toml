@@ -4,7 +4,7 @@ description = "A rust-written backend lib for edit and generation of lattice 3D-
 readme = "README.md"
 homepage = "https://github.com/TonyWu20/castep-model-generator-backend"
 repository = "https://github.com/TonyWu20/castep-model-generator-backend"
-version = "0.1.2"
+version = "1.0.0"
 edition = "2021"
 license = "MIT"
 keywords = [
@@ -19,7 +19,6 @@ keywords = [
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-regex = "1"
 nalgebra = "0.*"
 periodic_table = "0.3.2"
 periodic-table-on-an-enum = "0.3.2"
@@ -28,3 +27,4 @@ serde_yaml = "0.8.*"
 serde = { version = "1.*", features = ["derive"] }
 rayon = "1.*"
 glob = "0"
+nom = "7"

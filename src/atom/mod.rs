@@ -1,108 +1,23 @@
-use crate::{Export, Transformation};
+use crate::{MsiExport, Transformation};
 use ::core::fmt;
 use std::cmp::Ordering;
 
-use na::{Point3, Vector3};
-// Atom
+use na::Point3;
+/// Struct that defines an atom.
 #[derive(Debug, Clone)]
 pub struct Atom {
+    /// The name of the element.
     element_name: String,
+    /// The atomic number of the element in periodic table.
     element_id: u32,
+    /// The cartesian coordinate of the atom.
     xyz: Point3<f64>,
+    /// The id of the atom in the parsed model.
     atom_id: u32,
 }
 
-pub trait AtomArray {
-    fn get_atom_by_id(&self, atom_id: u32) -> Result<&Atom, String>;
-    fn get_mut_atom_by_id(&mut self, atom_id: u32) -> Result<&mut Atom, String>;
-    fn append_atom(&mut self, new_atom: Atom);
-    fn number_of_atoms(&self) -> usize;
-    fn get_vector_ab(&self, a_id: u32, b_id: u32) -> Result<Vector3<f64>, String>;
-}
-pub trait AtomArrayRef {
-    fn get_atom_by_id(&self, atom_id: u32) -> Result<&Atom, String>;
-    fn number_of_atoms(&self) -> usize;
-    fn get_vector_ab(&self, a_id: u32, b_id: u32) -> Result<Vector3<f64>, String>;
-}
-
-impl AtomArray for Vec<Atom> {
-    /// Get atom reference by id. The atom id is one-based index
-    fn get_atom_by_id(&self, atom_id: u32) -> Result<&Atom, String> {
-        self.get(atom_id as usize - 1)
-            .ok_or("Invalid atom index".to_string())
-    }
-
-    /// Get atom mutable reference by id. The atom id is one-based index
-    fn get_mut_atom_by_id(&mut self, atom_id: u32) -> Result<&mut Atom, String> {
-        self.get_mut(atom_id as usize - 1)
-            .ok_or("Invalid atom index".to_string())
-    }
-
-    fn append_atom(&mut self, new_atom: Atom) {
-        self.push(new_atom)
-    }
-
-    fn number_of_atoms(&self) -> usize {
-        self.len()
-    }
-
-    fn get_vector_ab(&self, a_id: u32, b_id: u32) -> Result<Vector3<f64>, String> {
-        let atom_a: &Atom = self.get_atom_by_id(a_id)?;
-        let atom_b: &Atom = self.get_atom_by_id(b_id)?;
-        let atom_a_xyz = atom_a.xyz();
-        let atom_b_xyz = atom_b.xyz();
-        Ok(atom_b_xyz - atom_a_xyz)
-    }
-}
-
-impl AtomArray for &mut Vec<Atom> {
-    fn get_atom_by_id(&self, atom_id: u32) -> Result<&Atom, String> {
-        self.get(atom_id as usize - 1)
-            .ok_or("Invalid atom index".to_string())
-    }
-
-    fn get_mut_atom_by_id(&mut self, atom_id: u32) -> Result<&mut Atom, String> {
-        self.get_mut(atom_id as usize - 1)
-            .ok_or("Invalid atom index".to_string())
-    }
-
-    fn append_atom(&mut self, new_atom: Atom) {
-        self.push(new_atom)
-    }
-
-    fn number_of_atoms(&self) -> usize {
-        self.len()
-    }
-
-    fn get_vector_ab(&self, a_id: u32, b_id: u32) -> Result<Vector3<f64>, String> {
-        let atom_a: &Atom = self.get_atom_by_id(a_id)?;
-        let atom_b: &Atom = self.get_atom_by_id(b_id)?;
-        let atom_a_xyz = atom_a.xyz();
-        let atom_b_xyz = atom_b.xyz();
-        Ok(atom_b_xyz - atom_a_xyz)
-    }
-}
-
-impl AtomArrayRef for &[Atom] {
-    fn get_atom_by_id(&self, atom_id: u32) -> Result<&Atom, String> {
-        self.get(atom_id as usize - 1)
-            .ok_or("Invalid atom index".to_string())
-    }
-
-    fn number_of_atoms(&self) -> usize {
-        self.len()
-    }
-
-    fn get_vector_ab(&self, a_id: u32, b_id: u32) -> Result<Vector3<f64>, String> {
-        let atom_a: &Atom = self.get_atom_by_id(a_id)?;
-        let atom_b: &Atom = self.get_atom_by_id(b_id)?;
-        let atom_a_xyz = atom_a.xyz();
-        let atom_b_xyz = atom_b.xyz();
-        Ok(atom_b_xyz - atom_a_xyz)
-    }
-}
-
 impl Atom {
+    /// Creates a new [`Atom`].
     pub fn new(element_name: String, element_id: u32, xyz: Point3<f64>, atom_id: u32) -> Self {
         Self {
             element_name,
@@ -112,35 +27,43 @@ impl Atom {
         }
     }
 
+    /// Returns a reference to the element name of this [`Atom`].
     pub fn element_name(&self) -> &str {
         &self.element_name
     }
+    /// Sets the element name of this [`Atom`].
     pub fn set_element_name(&mut self, new_name: &str) {
         self.element_name = new_name.to_string();
     }
+    /// Returns the element id of this [`Atom`].
     pub fn element_id(&self) -> u32 {
         self.element_id
     }
+    /// Sets the element id of this [`Atom`].
     pub fn set_element_id(&mut self, new_id: u32) {
         self.element_id = new_id;
     }
+    /// Returns a reference to the xyz of this [`Atom`].
     pub fn xyz(&self) -> &Point3<f64> {
         &self.xyz
     }
+    /// Sets the xyz of this [`Atom`].
     pub fn set_xyz(&mut self, new_xyz: Point3<f64>) {
         self.xyz = new_xyz;
     }
+    /// Returns the atom id of this [`Atom`].
     pub fn atom_id(&self) -> u32 {
         self.atom_id
     }
 
+    /// Sets the atom id of this [`Atom`].
     pub fn set_atom_id(&mut self, atom_id: u32) {
         self.atom_id = atom_id;
     }
 }
 
-impl Export for Atom {
-    fn format_output(&self) -> String {
+impl MsiExport for Atom {
+    fn output_in_msi(&self) -> String {
         let msi_output: String = format!(
             r#"  ({item_id} Atom
     (A C ACL "{elm_id} {elm}")
@@ -161,21 +84,20 @@ impl Export for Atom {
     }
 }
 
-impl Export for Vec<Atom> {
-    fn format_output(&self) -> String {
-        let atom_strings: Vec<String> = self.iter().map(|atom| atom.format_output()).collect();
-        atom_strings.concat()
-    }
-}
+// impl Export for Vec<Atom> {
+//     fn format_output(&self) -> String {
+//         let atom_strings: Vec<String> = self.iter().map(|atom| atom.format_output()).collect();
+//         atom_strings.concat()
+//     }
+// }
 
-impl Transformation for Vec<Atom> {
-    fn rotate(&mut self, rotate_quatd: na::UnitQuaternion<f64>) {
-        self.iter_mut()
-            .for_each(|atom: &mut Atom| atom.set_xyz(rotate_quatd.transform_point(atom.xyz())));
+impl Transformation for Atom {
+    fn rotate(&mut self, rotate_quatd: &na::UnitQuaternion<f64>) {
+        self.set_xyz(rotate_quatd.transform_point(self.xyz()))
     }
-    fn translate(&mut self, translate_matrix: na::Translation<f64, 3>) {
-        self.iter_mut()
-            .for_each(|atom: &mut Atom| atom.set_xyz(translate_matrix.transform_point(atom.xyz())));
+
+    fn translate(&mut self, translate_matrix: &na::Translation<f64, 3>) {
+        self.set_xyz(translate_matrix.transform_point(self.xyz()))
     }
 }
 

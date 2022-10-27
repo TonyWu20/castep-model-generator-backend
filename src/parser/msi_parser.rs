@@ -1,87 +1,130 @@
-use std::{error::Error, fs::read_to_string, path::Path};
-
-use nalgebra::{Matrix3, Point3, Vector3};
-use regex::{Captures, Regex};
-
-use crate::{
-    atom::Atom, external_info::adsorbate_table::AdsInfo, lattice::Lattice,
-    molecule::adsorbate::Adsorbate,
+use na::Point3;
+use nom::character::complete::{char, space0};
+use nom::multi::many1;
+use nom::{
+    branch::alt,
+    bytes::complete::{tag, take_until},
+    character::complete::alpha1,
+    sequence::{delimited, preceded, separated_pair, terminated, tuple},
+    IResult,
 };
 
-pub fn parse_atom(text: &str) -> Result<Vec<Atom>, Box<dyn Error>> {
-    let atom_re = Regex::new(
-        r#"ACL "([0-9]+) ([a-zA-Z]+).*
-.*Label ".*
-.*XYZ \(([0-9.e-]+) ([0-9.e-]+) ([0-9.e-]+).*
-.*Id ([0-9]+)"#,
-    )?;
-    assert!(atom_re.is_match(text));
-    let mut atom_struct_vec: Vec<Atom> = vec![];
-    for cap in atom_re.captures_iter(text) {
-        let element: String = cap[2].to_string();
-        let element_id: u32 = cap[1].to_string().parse::<u32>()?;
-        let point: Point3<f64> = na::point![
-            cap[3].to_string().parse::<f64>()?,
-            cap[4].to_string().parse::<f64>()?,
-            cap[5].to_string().parse::<f64>()?
-        ];
-        let atom_id: u32 = cap[6].to_string().parse::<u32>()?;
-        atom_struct_vec.push(Atom::new(element, element_id, point, atom_id));
-    }
-    Ok(atom_struct_vec)
+use crate::atom::Atom;
+
+use super::{decimal, float};
+extern crate nom;
+
+#[derive(Debug)]
+pub struct MsiModel {
+    lattice_vectors: Option<[[f64; 3]; 3]>,
+    atoms: Vec<Atom>,
 }
 
-pub fn parse_lattice_vectors(text: &str) -> Result<Matrix3<f64>, Box<dyn Error>> {
-    let lattice_vec_re = Regex::new(
-        r#".*A3 \(([0-9e. -]+)\)\)
-.*B3 \(([0-9e. -]+)\)\)
-.*C3 \(([0-9e. -]+)\)\)"#,
-    )?;
-    let match_result: Captures = lattice_vec_re
-        .captures(text)
-        .unwrap_or_else(|| panic!("Failed to match lattice vectors with regex."));
-    let mut lattice_vectors: Vec<Vector3<f64>> = vec![];
-    for i in 1..4 {
-        let vector = Vector3::from_iterator(
-            match_result[i]
-                .to_string()
-                .split_whitespace()
-                .flat_map(str::parse::<f64>)
-                .collect::<Vec<f64>>(),
-        );
-        lattice_vectors.push(vector);
+impl MsiModel {
+    pub fn new(lattice_vectors: Option<[[f64; 3]; 3]>, atoms: Vec<Atom>) -> Self {
+        Self {
+            lattice_vectors,
+            atoms,
+        }
     }
-    Ok(Matrix3::from_columns(&lattice_vectors))
 }
-pub fn parse_lattice(filename: &str) -> Result<Lattice, Box<dyn Error>> {
-    let contents = read_to_string(filename)?;
-    let lat_name: String = Path::new(filename)
-        .file_stem()
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .to_string();
-    let atoms: Vec<Atom> = parse_atom(&contents)?;
-    let lat_vectors: Matrix3<f64> = parse_lattice_vectors(&contents)?;
-    let lattice: Lattice =
-        Lattice::new(lat_name, atoms, lat_vectors, vec![73, 74, 75], None, false);
-    Ok(lattice)
+
+impl<'a> TryFrom<&'a String> for MsiModel {
+    type Error = nom::Err<nom::error::Error<&'a str>>;
+
+    fn try_from(value: &'a String) -> Result<Self, Self::Error> {
+        let (rest, _) = msi_model_start(value)?;
+        let parse_lattice_vec = lattice_vector(rest);
+        match parse_lattice_vec {
+            Ok(res) => {
+                let (rest, lattice_vectors) = res;
+                let atoms_parsed = many1(parse_atom)(rest);
+                match atoms_parsed {
+                    Ok(atoms) => Ok(MsiModel::new(Some(lattice_vectors), atoms.1)),
+                    Err(e) => Err(e),
+                }
+            }
+            Err(_) => {
+                let (_, atoms) = many1(parse_atom)(rest)?;
+                Ok(MsiModel::new(None, atoms))
+            }
+        }
+    }
 }
-pub fn parse_adsorbate(ads_info: &AdsInfo, parent_dir: &str) -> Result<Adsorbate, Box<dyn Error>> {
-    let ads_filepath = ads_info.file_path(parent_dir)?;
-    let contents = read_to_string(ads_filepath)?;
-    let atoms: Vec<Atom> = parse_atom(&contents)?;
-    let ads = Adsorbate::new(
-        ads_info.name().to_string(),
-        atoms,
-        ads_info.coord_atom_ids().len(),
-        ads_info.coord_atom_ids().to_vec(),
-        ads_info.stem_atom_ids().try_into()?,
-        ads_info.plane_atom_ids().try_into()?,
-        ads_info.vertical(),
-        ads_info.symmetric(),
-        ads_info.upper_atom_id(),
-        ads_info.path_name().to_string(),
-    );
-    Ok(ads)
+
+pub fn msi_model_start(input: &str) -> IResult<&str, &str> {
+    let model_head = tag("(1 Model\r\n");
+    preceded(take_until("(1 Model\r\n"), model_head)(input)
+}
+pub fn parse_xyz(input: &str) -> IResult<&str, [f64; 3]> {
+    let (rest, res) = terminated(
+        tuple((
+            terminated(alt((float, decimal)), space0),
+            terminated(alt((float, decimal)), space0),
+            alt((float, decimal)),
+        )),
+        tag("))\r\n"),
+    )(input)?;
+    let (x, y, z) = res;
+    Ok((
+        rest,
+        [
+            x.parse::<f64>().unwrap(),
+            y.parse::<f64>().unwrap(),
+            z.parse::<f64>().unwrap(),
+        ],
+    ))
+}
+pub fn lattice_vector(input: &str) -> IResult<&str, [[f64; 3]; 3]> {
+    let (rest, _) = preceded(take_until("A D A3 ("), tag("A D A3 ("))(input)?;
+    let (rest, vector_a) = parse_xyz(rest)?;
+    let (rest, _) = preceded(take_until("A D B3 ("), tag("A D B3 ("))(rest)?;
+    let (rest, vector_b) = parse_xyz(rest)?;
+    let (rest, _) = preceded(take_until("A D C3 ("), tag("A D C3 ("))(rest)?;
+    let (rest, vector_c) = parse_xyz(rest)?;
+    Ok((rest, [vector_a, vector_b, vector_c]))
+}
+
+pub fn parse_atom(input: &str) -> IResult<&str, Atom> {
+    let (rest, _) = tuple((tag("  ("), decimal, tag(" Atom\r\n")))(input)?;
+    let (rest, element_line) = delimited(
+        tag("    (A C ACL \""),
+        separated_pair(decimal, char(' '), alpha1),
+        tag("\")\r\n"),
+    )(rest)?;
+    let (element_id, element_name) = element_line;
+    let (rest, xyz) = alt((
+        preceded(
+            tuple((
+                tag("    (A C Label \""),
+                alpha1,
+                tag("\")\r\n"),
+                tag("    (A D XYZ ("),
+            )),
+            parse_xyz,
+        ),
+        preceded(tag("    (A D XYZ ("), parse_xyz),
+    ))(rest)?;
+    let (rest, atom_id) = preceded(tag("    (A I Id "), decimal)(rest)?;
+    let (rest, _) = tag(")\r\n  )\r\n")(rest)?;
+    let element_id = element_id.parse::<u32>().unwrap();
+    let atom_id = atom_id.parse::<u32>().unwrap();
+    let xyz = Point3::from_slice(&xyz);
+    Ok((
+        rest,
+        Atom::new(element_name.to_string(), element_id, xyz, atom_id),
+    ))
+}
+
+#[cfg(test)]
+#[test]
+fn test_msi() {
+    let test_flaw = std::fs::read_to_string("C2H4_flawed.msi").unwrap();
+    // let (rest, _) = msi_model_start(&test_flaw).unwrap();
+    // let (rest, atom) = many1(parse_atom)(rest).unwrap();
+    let ad = MsiModel::try_from(&test_flaw);
+    match ad {
+        Ok(ad) => println!("{:?}", ad),
+        Err(e) => println!("{}", e),
+    }
 }
