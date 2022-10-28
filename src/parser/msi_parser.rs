@@ -1,5 +1,5 @@
 use na::Point3;
-use nom::character::complete::{char, space0};
+use nom::character::complete::{char, crlf, space0};
 use nom::multi::many1;
 use nom::{
     branch::alt,
@@ -37,15 +37,16 @@ impl MsiModel {
     }
 }
 
-impl<'a> TryFrom<&'a String> for MsiModel {
+impl<'a> TryFrom<&'a str> for MsiModel {
     type Error = nom::Err<nom::error::Error<&'a str>>;
 
-    fn try_from(value: &'a String) -> Result<Self, Self::Error> {
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
         let (rest, _) = msi_model_start(value)?;
         let parse_lattice_vec = lattice_vector(rest);
         match parse_lattice_vec {
             Ok(res) => {
                 let (rest, lattice_vectors) = res;
+                let (rest, _) = preceded(take_until("\r\n"), tag("\r\n"))(rest)?;
                 let atoms_parsed = many1(parse_atom)(rest);
                 match atoms_parsed {
                     Ok(atoms) => Ok(MsiModel::new(Some(lattice_vectors), atoms.1)),
@@ -127,12 +128,17 @@ pub fn parse_atom(input: &str) -> IResult<&str, Atom> {
 #[cfg(test)]
 #[test]
 fn test_msi() {
+    use std::fs::read_to_string;
+
     let test_flaw = std::fs::read_to_string("C2H4_flawed.msi").unwrap();
     // let (rest, _) = msi_model_start(&test_flaw).unwrap();
     // let (rest, atom) = many1(parse_atom)(rest).unwrap();
-    let ad = MsiModel::try_from(&test_flaw);
+    let ad = MsiModel::try_from(test_flaw.as_str());
     match ad {
         Ok(ad) => println!("{:?}", ad),
         Err(e) => println!("{}", e),
     }
+    let test_lat = read_to_string("SAC_GDY_V.msi").unwrap();
+    let lat = MsiModel::try_from(test_lat.as_str()).unwrap();
+    println!("{:?}", lat);
 }
