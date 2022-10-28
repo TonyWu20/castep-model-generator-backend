@@ -27,6 +27,14 @@ impl MsiModel {
             atoms,
         }
     }
+
+    pub fn lattice_vectors(&self) -> Option<[[f64; 3]; 3]> {
+        self.lattice_vectors
+    }
+
+    pub fn atoms(&self) -> &[Atom] {
+        self.atoms.as_ref()
+    }
 }
 
 impl<'a> TryFrom<&'a String> for MsiModel {
