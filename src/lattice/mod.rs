@@ -16,7 +16,7 @@ pub trait LatticeTraits {
     Set the bool field `sorted` in the `Lattice` struct. Your `Lattice` struct must provide this field.
     The implementation depends on the specific name of the field given.
     */
-    fn set_atoms_sorted(&self, is_sorted: bool);
+    fn set_atoms_sorted(&mut self, is_sorted: bool);
     /**
     Return if the field `atoms` is sorted.
     The implementation depends on the specific name of the field given.
