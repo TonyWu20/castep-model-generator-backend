@@ -45,5 +45,12 @@ fn test_yaml() -> Result<(), Box<dyn Error>> {
     println!("{:?}", project_info);
     let coord_sites_dict = project_info.hash_coord_site();
     println!("{}", coord_sites_dict.get(&41).unwrap());
+    let elements: Vec<element_table::Element> = table
+        .elements()
+        .unwrap()
+        .iter()
+        .map(|elm| elm.clone())
+        .collect();
+    println!("{:?}", elements);
     Ok(())
 }
