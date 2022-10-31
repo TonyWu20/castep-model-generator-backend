@@ -6,6 +6,7 @@ use external_info::element_table::Element;
 pub mod assemble;
 pub mod atom;
 pub mod cell;
+pub mod error;
 pub mod external_info;
 pub mod lattice;
 pub mod molecule;
