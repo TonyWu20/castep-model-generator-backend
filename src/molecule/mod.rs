@@ -24,7 +24,7 @@ pub trait Molecule {
     /**
     Return the mutable reference to `Vec<Atom>` as `&mut Vec<Atom>`.
     */
-    fn get_mut_atoms(&self) -> &mut Vec<Atom>;
+    fn get_mut_atoms(&mut self) -> &mut Vec<Atom>;
     /**
     Return the immutable reference to an `Atom` as `&Atom`. The `atom_id` is 1-indexed, follows the
     rules in `.msi` format.
