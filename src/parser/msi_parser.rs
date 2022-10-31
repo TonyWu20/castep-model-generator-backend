@@ -130,7 +130,7 @@ pub fn parse_atom(input: &str) -> IResult<&str, Atom> {
 fn test_msi() {
     use std::fs::read_to_string;
 
-    let test_flaw = std::fs::read_to_string("C2H4_flawed.msi").unwrap();
+    let test_flaw = std::fs::read_to_string("COOH.msi").unwrap();
     // let (rest, _) = msi_model_start(&test_flaw).unwrap();
     // let (rest, atom) = many1(parse_atom)(rest).unwrap();
     let ad = MsiModel::try_from(test_flaw.as_str());
