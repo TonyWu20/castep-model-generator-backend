@@ -18,6 +18,8 @@ pub trait AdsorbateTraits: Molecule + Transformation {
     fn get_stem_atom_ids(&self) -> [u32; 2];
     /// Returns the ids for atoms that define the desired plane of the adsorbates.
     fn get_plane_atom_ids(&self) -> [u32; 3];
+    /// Returns the reference to coordination atom vector.
+    fn get_coord_atoms(&self) -> &[u32];
     /// Returns the vector of the stem of the adsorbate.
     fn get_stem_vector(&self) -> Result<Vector3<f64>, InvalidIndex> {
         Ok(self.get_vector_ab(self.get_stem_atom_ids()[0], self.get_stem_atom_ids()[1])?)
