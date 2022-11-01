@@ -1,5 +1,6 @@
 use na::Point3;
-use nom::character::complete::{char, crlf, space0};
+use nom::character::complete::{char, line_ending, space0, space1};
+use nom::combinator::recognize;
 use nom::multi::many1;
 use nom::{
     branch::alt,
@@ -61,11 +62,14 @@ impl<'a> TryFrom<&'a str> for MsiModel {
     }
 }
 
-pub fn msi_model_start(input: &str) -> IResult<&str, &str> {
+/// Skip the header of the file.
+fn msi_model_start(input: &str) -> IResult<&str, &str> {
     let model_head = tag("(1 Model\r\n");
     preceded(take_until("(1 Model\r\n"), model_head)(input)
 }
-pub fn parse_xyz(input: &str) -> IResult<&str, [f64; 3]> {
+
+/// Parse XYZ in `msi` file. Since it possibly write `0` instead of `0.0`, we have to parse with `alt((float, decimal))`
+fn parse_xyz(input: &str) -> IResult<&str, [f64; 3]> {
     let (rest, res) = terminated(
         tuple((
             terminated(alt((float, decimal)), space0),
@@ -84,7 +88,8 @@ pub fn parse_xyz(input: &str) -> IResult<&str, [f64; 3]> {
         ],
     ))
 }
-pub fn lattice_vector(input: &str) -> IResult<&str, [[f64; 3]; 3]> {
+/// Parse the lattice vector block in `msi` file format.
+fn lattice_vector(input: &str) -> IResult<&str, [[f64; 3]; 3]> {
     let (rest, _) = preceded(take_until("A D A3 ("), tag("A D A3 ("))(input)?;
     let (rest, vector_a) = parse_xyz(rest)?;
     let (rest, _) = preceded(take_until("A D B3 ("), tag("A D B3 ("))(rest)?;
@@ -94,28 +99,48 @@ pub fn lattice_vector(input: &str) -> IResult<&str, [[f64; 3]; 3]> {
     Ok((rest, [vector_a, vector_b, vector_c]))
 }
 
-pub fn parse_atom(input: &str) -> IResult<&str, Atom> {
-    let (rest, _) = tuple((tag("  ("), decimal, tag(" Atom\r\n")))(input)?;
+/// Parse atom blocks in `msi` file format.
+/// Use space1 to handle 2/4 spaces cases. Use `line_ending` to handle `\n` (in unix-format) or `\r\n` (in dos-format)
+fn parse_atom<'b, 'a: 'b>(input: &'a str) -> IResult<&'a str, Atom> {
+    // This gives the nth of `Atom` blocks.
+    let (rest, _) = tuple((
+        tuple((space1, tag("("))),
+        decimal,
+        tag(" Atom"),
+        line_ending,
+    ))(input)?;
+    // Parser to recognize and consume `")\r\n` or `")\n`
+    let quoted_ending_block = |input: &'a str| -> IResult<&'a str, &'b str> {
+        recognize(tuple((tag("\")"), line_ending)))(input)
+    };
+    // Parser to recognize and consume `)\r\n` or `)\n`
+    let ending_block = |input: &'a str| -> IResult<&'a str, &'b str> {
+        recognize(tuple((tag(")"), line_ending)))(input)
+    };
+    // This will parse the atomic number and element name.
     let (rest, element_line) = delimited(
-        tag("    (A C ACL \""),
-        separated_pair(decimal, char(' '), alpha1),
-        tag("\")\r\n"),
+        tuple((space1, tag("(A C ACL \""))),
+        separated_pair(decimal, char(' '), alpha1), // Example: (A C ACL "6 C")
+        quoted_ending_block,
     )(rest)?;
     let (element_id, element_name) = element_line;
+    // Alternative cases: with a line of `Label` before `XYZ`, or without
     let (rest, xyz) = alt((
         preceded(
             tuple((
-                tag("    (A C Label \""),
+                tuple((space1, tag("(A C Label \""))),
                 alpha1,
-                tag("\")\r\n"),
-                tag("    (A D XYZ ("),
+                quoted_ending_block,
+                tuple((space1, tag("(A D XYZ ("))),
             )),
             parse_xyz,
         ),
-        preceded(tag("    (A D XYZ ("), parse_xyz),
+        preceded(tuple((space1, tag("(A D XYZ ("))), parse_xyz),
     ))(rest)?;
-    let (rest, atom_id) = preceded(tag("    (A I Id "), decimal)(rest)?;
-    let (rest, _) = tag(")\r\n  )\r\n")(rest)?;
+    // Parse `atom_id`
+    let (rest, atom_id) = preceded(tuple((space1, tag("(A I Id "))), decimal)(rest)?;
+    // Travel out the block
+    let (rest, _) = tuple((ending_block, space1, ending_block))(rest)?;
     let element_id = element_id.parse::<u32>().unwrap();
     let atom_id = atom_id.parse::<u32>().unwrap();
     let xyz = Point3::from_slice(&xyz);
@@ -130,7 +155,7 @@ pub fn parse_atom(input: &str) -> IResult<&str, Atom> {
 fn test_msi() {
     use std::fs::read_to_string;
 
-    let test_flaw = std::fs::read_to_string("COOH.msi").unwrap();
+    let test_flaw = read_to_string("COOH.msi").unwrap();
     // let (rest, _) = msi_model_start(&test_flaw).unwrap();
     // let (rest, atom) = many1(parse_atom)(rest).unwrap();
     let ad = MsiModel::try_from(test_flaw.as_str());
