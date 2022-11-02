@@ -1,4 +1,5 @@
 use na::Point3;
+use nom::bytes::complete::take_till;
 use nom::character::complete::{char, line_ending, space0, space1};
 use nom::combinator::recognize;
 use nom::multi::many1;
@@ -47,7 +48,8 @@ impl<'a> TryFrom<&'a str> for MsiModel {
         match parse_lattice_vec {
             Ok(res) => {
                 let (rest, lattice_vectors) = res;
-                let (rest, _) = preceded(take_until("\r\n"), tag("\r\n"))(rest)?;
+                let (rest, _) =
+                    preceded(alt((take_until("\r\n"), take_until("\n"))), line_ending)(rest)?;
                 let atoms_parsed = many1(parse_atom)(rest);
                 match atoms_parsed {
                     Ok(atoms) => Ok(MsiModel::new(Some(lattice_vectors), atoms.1)),
