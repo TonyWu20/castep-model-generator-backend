@@ -64,11 +64,11 @@ impl<'a> TryFrom<&'a str> for MsiModel {
 }
 
 /// Skip the header of the file.
-fn msi_model_start(input: &str) -> IResult<&str, (&str, &str)> {
-    preceded(
-        take_until("(1 Model"),
-        tuple((tag("(1 Model"), line_ending)),
-    )(input)
+fn msi_model_start(input: &str) -> IResult<&str, &str> {
+    alt((
+        preceded(take_until("(1 Model\r\n"), tag("(1 Model\r\n")),
+        preceded(take_until("(1 Model\n"), tag("(1 Model\n")),
+    ))(input)
 }
 
 /// Parse XYZ in `msi` file. Since it possibly write `0` instead of `0.0`, we have to parse with `alt((float, decimal))`
@@ -79,7 +79,7 @@ fn parse_xyz(input: &str) -> IResult<&str, [f64; 3]> {
             terminated(alt((float, decimal)), space0),
             alt((float, decimal)),
         )),
-        tag("))\r\n"),
+        alt((tag("))\r\n"), tag("))\n"))),
     )(input)?;
     let (x, y, z) = res;
     Ok((
@@ -166,7 +166,7 @@ fn test_msi() {
         Ok(ad) => println!("{:?}", ad),
         Err(e) => println!("{}", e),
     }
-    let test_lat = read_to_string("SAC_GDY_V.msi").unwrap();
+    let test_lat = read_to_string("SAC_GDY_Ag.msi").unwrap();
     let lat = MsiModel::try_from(test_lat.as_str()).unwrap();
     println!("{:?}", lat);
 }
