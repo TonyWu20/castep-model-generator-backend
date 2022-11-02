@@ -15,14 +15,14 @@ pub trait AddAdsorbate<P: AdsorbateTraits + Clone> {
     /// Initiate the adsorbate orientation before moving to target positions.
     fn init_ads_direction(
         &self,
-        ads: &P,
+        ads: &mut P,
         target_sites: &[u32],
         flip_upright: bool,
     ) -> Result<(), Box<dyn Error>>;
     /// Routine to add adsorbate to the lattice.
     fn add_ads(
         &mut self,
-        ads: &P,
+        ads: &mut P,
         target_sites: &[u32],
         height: f64,
         flip_upright: bool,
