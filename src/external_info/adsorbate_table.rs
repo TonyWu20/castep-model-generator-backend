@@ -1,13 +1,6 @@
 /// Parse adsorbate info `yaml` file to get necessary information for loading adsorbate models.
 extern crate serde;
-use std::{
-    collections::HashMap,
-    error::Error,
-    fs,
-    ops::Deref,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use std::{collections::HashMap, error::Error, ops::Deref, path::Path};
 
 use serde::{Deserialize, Serialize};
 
@@ -69,14 +62,6 @@ impl AdsInfo {
     pub fn path_name(&self) -> &str {
         self.path_name.as_ref()
     }
-    pub fn file_path(&self, parent_dir: &str) -> Result<PathBuf, std::convert::Infallible> {
-        PathBuf::from_str(&format!(
-            "{}/{}_path/{}.msi",
-            parent_dir,
-            self.path_name(),
-            self.name()
-        ))
-    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
@@ -104,7 +89,7 @@ impl YamlTable for AdsTab {
     type HashKey = String;
 
     fn load_table<P: AsRef<Path>>(filepath: P) -> Result<Self::Table, Box<dyn Error>> {
-        let ads_table_src = fs::File::open(filepath)?;
+        let ads_table_src = std::fs::File::open(filepath)?;
         let ads_table = serde_yaml::from_reader(ads_table_src)?;
         Ok(ads_table)
     }
@@ -119,10 +104,4 @@ impl YamlTable for AdsTab {
         });
         Ok(hash_tab)
     }
-}
-
-pub fn load_ads_table() -> Result<AdsTab, Box<dyn Error>> {
-    let ads_table_src = fs::File::open("./resources/ads_table.yaml")?;
-    let ads_table = serde_yaml::from_reader(ads_table_src)?;
-    Ok(ads_table)
 }
