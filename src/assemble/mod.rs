@@ -3,7 +3,7 @@ use std::{collections::HashMap, error::Error};
 
 use crate::molecule::adsorbate::AdsorbateTraits;
 
-/// For lattice that can add adsorbate
+/// For lattice that can add adsorbate. The adsorbate must implement `AdsorbateTraits` and `Clone`
 pub trait AddAdsorbate<P: AdsorbateTraits + Clone> {
     /// Generate suffix about adsorbate and coordination sites.
     fn append_mol_name(
