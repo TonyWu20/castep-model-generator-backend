@@ -63,9 +63,11 @@ impl<'a> TryFrom<&'a str> for MsiModel {
 }
 
 /// Skip the header of the file.
-fn msi_model_start(input: &str) -> IResult<&str, &str> {
-    let model_head = tag("(1 Model\r\n");
-    preceded(take_until("(1 Model\r\n"), model_head)(input)
+fn msi_model_start(input: &str) -> IResult<&str, (&str, &str)> {
+    preceded(
+        take_until("(1 Model"),
+        tuple((tag("(1 Model"), line_ending)),
+    )(input)
 }
 
 /// Parse XYZ in `msi` file. Since it possibly write `0` instead of `0.0`, we have to parse with `alt((float, decimal))`
