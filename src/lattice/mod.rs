@@ -2,16 +2,12 @@ use std::collections::HashSet;
 
 use na::{Matrix3, UnitQuaternion, Vector, Vector3};
 
-use crate::{atom::Atom, Transformation};
+use crate::{atom::Atom, molecule::Molecule, Transformation};
 
 /// Common behaviours that a struct representing a `Lattice` should have.
-pub trait LatticeTraits {
+pub trait LatticeTraits: Molecule {
     /// Returns the lattice vectors in `Matrix3` type.
     fn get_lattice_vectors(&self) -> &Matrix3<f64>;
-    /// Returns the reference to the Vec<Atom>.
-    fn get_atoms(&self) -> &[Atom];
-    /// Returns the mutable reference to the Vec<Atom>.
-    fn get_mut_atoms(&mut self) -> &mut Vec<Atom>;
     /**
     Set the bool field `sorted` in the `Lattice` struct. Your `Lattice` struct must provide this field.
     The implementation depends on the specific name of the field given.
