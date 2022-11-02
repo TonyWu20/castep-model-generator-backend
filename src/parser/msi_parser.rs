@@ -1,5 +1,4 @@
 use na::Point3;
-use nom::bytes::complete::take_till;
 use nom::character::complete::{char, line_ending, space0, space1};
 use nom::combinator::recognize;
 use nom::multi::many1;
