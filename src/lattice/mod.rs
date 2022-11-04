@@ -7,7 +7,7 @@ use crate::{molecule::Molecule, Transformation};
 /// Common behaviours that a struct representing a `Lattice` should have.
 pub trait LatticeTraits: Molecule {
     /// Returns the lattice name.
-    fn get_lattice_name(&self) -> String;
+    fn get_lattice_name(&self) -> &str;
     /// Returns the lattice vectors in `Matrix3` type.
     fn get_lattice_vectors(&self) -> &Matrix3<f64>;
     /**
