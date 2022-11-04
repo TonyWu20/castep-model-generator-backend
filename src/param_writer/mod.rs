@@ -8,13 +8,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{cell::CellOutput, lattice::LatticeTraits};
+use crate::{cell::CellOutput, lattice::LatticeTraits, MsiExport};
 
-pub trait ParamWriter: CellOutput + LatticeTraits {
-    fn generate_all_seed_files(
-        target_root_dir: &str,
-        potentials_loc: &str,
-    ) -> Result<(), Box<dyn Error>>;
+pub trait ParamWriter: CellOutput + LatticeTraits + MsiExport {
     fn to_xsd_scripts(target_root_dir: &str) -> Result<(), Box<dyn Error>> {
         let msi_pattern = format!("{target_root_dir}/**/*.msi");
         let item_collection = glob(&msi_pattern)
@@ -65,7 +61,32 @@ use MaterialsScript qw(:all);
         &mut self,
         target_root_dir: &str,
         potentials_loc: &str,
-    ) -> Result<(), Box<dyn Error>>;
+    ) -> Result<(), Box<dyn Error>> {
+        let cell_path = self.export_filepath(target_root_dir, ".cell")?;
+        fs::write(cell_path, self.cell_output())?;
+        self.write_param(target_root_dir, potentials_loc)?;
+        self.write_kptaux(target_root_dir)?;
+        self.write_trjaux(target_root_dir)?;
+        #[cfg(not(debug_assertions))]
+        self.copy_potentials(target_root_dir, potentials_loc)?;
+        self.copy_smcastep_extension(target_root_dir)?;
+        self.write_lsf_script(target_root_dir)?;
+        let export_dir = self.export_destination(target_root_dir)?;
+        let msi_path = export_dir
+            .parent()
+            .unwrap()
+            .join(&format!("{}.msi", self.get_lattice_name()));
+        if msi_path.exists() == false {
+            let msi_content = self.output_in_msi();
+            fs::write(msi_path, msi_content)?;
+        } else {
+            let moved_dest = export_dir.join(&msi_path.file_name().unwrap());
+            if moved_dest.exists() == false {
+                fs::rename(&msi_path, moved_dest)?;
+            }
+        }
+        Ok(())
+    }
     fn export_destination(&self, target_root_dir: &str) -> Result<PathBuf, Box<dyn Error>> {
         let lattice_name = self.get_lattice_name();
         let dir_path = format!("{target_root_dir}/{lattice_name}_opt");
@@ -75,10 +96,10 @@ use MaterialsScript qw(:all);
     fn export_filepath(
         &self,
         target_root_dir: &str,
-        filename: &str,
+        file_extension: &str,
     ) -> Result<PathBuf, Box<dyn Error>> {
         let export_dest = self.export_destination(target_root_dir)?;
-        let filename = format!("{}{}", self.get_lattice_name(), filename);
+        let filename = format!("{}{}", self.get_lattice_name(), file_extension);
         Ok(export_dest.join(filename))
     }
     fn get_final_cutoff_energy(&self, potentials_loc: &str) -> f64 {
