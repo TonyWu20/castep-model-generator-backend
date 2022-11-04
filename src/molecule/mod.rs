@@ -33,7 +33,7 @@ pub trait Molecule {
     fn get_atom_by_id(&self, atom_id: u32) -> Result<&Atom, InvalidIndex> {
         self.get_atoms()
             .get(atom_id as usize - 1)
-            .ok_or_else(|| InvalidIndex.into())
+            .ok_or(InvalidIndex)
     }
     /**
     Return the mutable reference to an `Atom` as `&mut Atom`. The `atom_id` is 1-indexed, follows the
@@ -43,7 +43,7 @@ pub trait Molecule {
     fn get_mut_atom_by_id(&mut self, atom_id: u32) -> Result<&mut Atom, InvalidIndex> {
         self.get_mut_atoms()
             .get_mut(atom_id as usize - 1)
-            .ok_or_else(|| InvalidIndex.into())
+            .ok_or(InvalidIndex)
     }
     /**
     Return a `Vector3<f64>` pointing from a to b.

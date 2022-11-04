@@ -6,8 +6,8 @@ use na::Point3;
 /// Struct that defines an atom.
 #[derive(Debug, Clone)]
 pub struct Atom {
-    /// The name of the element.
-    element_name: String,
+    /// The symbol of the element.
+    element_symbol: String,
     /// The atomic number of the element in periodic table.
     element_id: u32,
     /// The cartesian coordinate of the atom.
@@ -18,9 +18,9 @@ pub struct Atom {
 
 impl Atom {
     /// Creates a new [`Atom`].
-    pub fn new(element_name: String, element_id: u32, xyz: Point3<f64>, atom_id: u32) -> Self {
+    pub fn new(element_symbol: String, element_id: u32, xyz: Point3<f64>, atom_id: u32) -> Self {
         Self {
-            element_name,
+            element_symbol,
             element_id,
             xyz,
             atom_id,
@@ -28,12 +28,12 @@ impl Atom {
     }
 
     /// Returns a reference to the element name of this [`Atom`].
-    pub fn element_name(&self) -> &str {
-        &self.element_name
+    pub fn element_symbol(&self) -> &str {
+        &self.element_symbol
     }
     /// Sets the element name of this [`Atom`].
-    pub fn set_element_name(&mut self, new_name: &str) {
-        self.element_name = new_name.to_string();
+    pub fn set_element_symbol(&mut self, new_symbol: &str) {
+        self.element_symbol = new_symbol.to_string();
     }
     /// Returns the element id of this [`Atom`].
     pub fn element_id(&self) -> u32 {
@@ -74,7 +74,7 @@ impl MsiExport for Atom {
 "#,
             item_id = self.atom_id() + 1,
             elm_id = self.element_id(),
-            elm = self.element_name(),
+            elm = self.element_symbol(),
             x = self.xyz().x,
             y = self.xyz().y,
             z = self.xyz().z,
@@ -106,7 +106,7 @@ impl fmt::Display for Atom {
         write!(
             f,
             "Element: {}\nElement ID: {}\ncoord: {}\nAtom ID: {}",
-            self.element_name, self.element_id, self.xyz, self.atom_id
+            self.element_symbol, self.element_id, self.xyz, self.atom_id
         )
     }
 }

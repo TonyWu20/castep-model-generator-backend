@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use crate::lattice::LatticeTraits;
 
-use crate::{external_info::element_table::Element, lattice::LatticeTraits};
+use cpt::{data::ELEMENT_TABLE, element::LookupElement};
 
 /**
 Trait to Produce `.cell` from the lattice. Required `LatticeTraits` to be implemented.
@@ -25,36 +25,33 @@ pub trait CellOutput: LatticeTraits {
     }
     /// Convert the cartesian coordinates of atoms to fractional coordinates in the lattice.
     /// External information is required to provide spin number when necessary.
-    fn positions_str(&self, element_info: &HashMap<String, Element>) -> (String, String) {
+    fn positions_str(&self) -> (String, String) {
         assert!(self.is_atoms_sorted());
         let pos_strings: Vec<String> = self
             .get_atoms()
             .iter()
             .map(|atom| {
                 let frac_coord = self.fractional_coord_matrix() * atom.xyz();
-                let atom_info = element_info.get(atom.element_name()).expect(&format!(
-                    "Element {} not in element hash table!",
-                    atom.element_name()
-                ));
+                let atom_info = ELEMENT_TABLE.get_by_symbol(atom.element_symbol()).unwrap();
                 if atom_info.spin > 0 {
                     let line = format!(
                         "{:>3}{:20.16}{:20.16}{:20.16} SPIN={:14.10}\n",
-                        atom.element_name(),
+                        atom.element_symbol(),
                         frac_coord[0],
                         frac_coord[1],
                         frac_coord[2],
                         atom_info.spin as f64
                     );
-                    return line;
+                    line
                 } else {
                     let line = format!(
                         "{:>3}{:20.16}{:20.16}{:20.16}\n",
-                        atom.element_name(),
+                        atom.element_symbol(),
                         frac_coord[0],
                         frac_coord[1],
                         frac_coord[2],
                     );
-                    return line;
+                    line
                 }
             })
             .collect();
@@ -96,61 +93,61 @@ pub trait CellOutput: LatticeTraits {
         misc
     }
     /// Lookup the mass of the species from the given hashmap from the external element info table.
-    fn species_mass_str(&self, element_info: &HashMap<String, Element>) -> (String, String) {
+    fn species_mass_str(&self) -> (String, String) {
         let element_list = self.list_element();
         let mass_strings: Vec<String> = element_list
             .iter()
             .map(|elm| -> String {
-                let mass: f64 = element_info.get(elm).unwrap().mass;
+                let mass: f64 = ELEMENT_TABLE.get_by_symbol(elm).unwrap().mass();
                 format!("{:>8}{:17.10}\n", elm, mass)
             })
             .collect();
         ("SPECIES_MASS".to_string(), mass_strings.concat())
     }
     /// Lookup the potential files to used from the external element info table.
-    fn species_pot_str(&self, element_info: &HashMap<String, Element>) -> (String, String) {
+    fn species_pot_str(&self) -> (String, String) {
         let element_list = self.list_element();
         let pot_strings: Vec<String> = element_list
             .iter()
             .map(|elm| {
-                let pot_file = &element_info.get(elm).unwrap().pot;
+                let pot_file = ELEMENT_TABLE.get_by_symbol(elm).unwrap().potential();
                 format!("{:>8}  {}\n", elm, pot_file)
             })
             .collect();
         ("SPECIES_POT".to_string(), pot_strings.concat())
     }
     /// Lookup the lcao states of species from the external element info table.
-    fn species_lcao_str(&self, element_info: &HashMap<String, Element>) -> (String, String) {
+    fn species_lcao_str(&self) -> (String, String) {
         let element_list = self.list_element();
         let lcao_strings: Vec<String> = element_list
             .iter()
             .map(|elm| {
-                let lcao_state = &element_info.get(elm).unwrap().lcao;
+                let lcao_state = ELEMENT_TABLE.get_by_symbol(elm).unwrap().lcao();
                 format!("{:>8}{:9}\n", elm, lcao_state)
             })
             .collect();
         ("SPECIES_LCAO_STATES".to_string(), lcao_strings.concat())
     }
     /// The whole process of generating a `.cell` from the lattice.
-    fn cell_output(&mut self, element_info: &HashMap<String, Element>) -> String {
-        if self.is_atoms_sorted() == false {
+    fn cell_output(&mut self) -> String {
+        if !self.is_atoms_sorted() {
             self.sort_by_atomic_number();
         }
         self.rotate_to_standard_orientation();
         let mut content = String::new();
         let block_lat_vec = self.write_block(self.lattice_vector_str());
         content.push_str(&block_lat_vec);
-        let block_pos = self.write_block(self.positions_str(&element_info));
+        let block_pos = self.write_block(self.positions_str());
         content.push_str(&block_pos);
         let block_kpoints_list = self.write_block(self.kpoints_list_str());
         content.push_str(&block_kpoints_list);
         let block_misc = self.misc_str();
         content.push_str(&block_misc);
-        let block_mass = self.write_block(self.species_mass_str(&element_info));
+        let block_mass = self.write_block(self.species_mass_str());
         content.push_str(&block_mass);
-        let block_pot = self.write_block(self.species_pot_str(&element_info));
+        let block_pot = self.write_block(self.species_pot_str());
         content.push_str(&block_pot);
-        let block_lcao = self.write_block(self.species_lcao_str(&element_info));
+        let block_lcao = self.write_block(self.species_lcao_str());
         content.push_str(&block_lcao);
         content
     }

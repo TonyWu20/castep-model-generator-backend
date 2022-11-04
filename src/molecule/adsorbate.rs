@@ -22,7 +22,7 @@ pub trait AdsorbateTraits: Molecule + Transformation {
     fn get_coord_atoms(&self) -> &[u32];
     /// Returns the vector of the stem of the adsorbate.
     fn get_stem_vector(&self) -> Result<Vector3<f64>, InvalidIndex> {
-        Ok(self.get_vector_ab(self.get_stem_atom_ids()[0], self.get_stem_atom_ids()[1])?)
+        self.get_vector_ab(self.get_stem_atom_ids()[0], self.get_stem_atom_ids()[1])
     }
     /// Returns the normal vector of the plane.
     fn get_plane_normal(&self) -> Result<Vector3<f64>, InvalidIndex> {
@@ -62,7 +62,7 @@ pub trait AdsorbateTraits: Molecule + Transformation {
             let rot_quatd = UnitQuaternion::from_axis_angle(&rot_axis, angle);
             self.rotate(&rot_quatd);
         };
-        if self.is_upward()? == false {
+        if !(self.is_upward()?) {
             let stem_vector = self.get_stem_vector()?;
             let invert_quatd =
                 UnitQuaternion::from_axis_angle(&Unit::new_normalize(stem_vector), PI);

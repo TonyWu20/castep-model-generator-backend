@@ -6,12 +6,12 @@ pub mod param_writer {
     use std::{collections::HashMap, fs::read_to_string};
 
     use crate::atom::AtomArrayRef;
-    use crate::external_info::element_table::{self, Element};
     use crate::external_info::YamlTable;
     use crate::lattice::Lattice;
     use crate::parser::msi_parser::parse_lattice;
     use crate::Export;
     use crate::{atom::Atom, cell::CellOutput};
+    use cpt::data::ELEMENTS;
     use glob::glob;
     use rayon::prelude::*;
     use regex::Regex;
@@ -171,7 +171,7 @@ use MaterialsScript qw(:all);
 
     fn get_final_cutoff_energy(
         lattice: &Lattice,
-        element_infotab: &HashMap<String, Element>,
+        element_infotab: &[Element],
         potentials_loc: &str,
     ) -> f64 {
         let mut energy: f64 = 0.0;

@@ -14,6 +14,7 @@ pub mod param_writer;
 pub mod parser;
 pub mod test;
 
+extern crate castep_periodic_table as cpt;
 extern crate nalgebra as na;
 
 /// Shared behaviour for structs representing an atom, a molecule and a lattice

@@ -2,10 +2,12 @@ use std::collections::HashSet;
 
 use na::{Matrix3, UnitQuaternion, Vector, Vector3};
 
-use crate::{atom::Atom, molecule::Molecule, Transformation};
+use crate::{molecule::Molecule, Transformation};
 
 /// Common behaviours that a struct representing a `Lattice` should have.
 pub trait LatticeTraits: Molecule {
+    /// Returns the lattice name.
+    fn get_lattice_name(&self) -> String;
     /// Returns the lattice vectors in `Matrix3` type.
     fn get_lattice_vectors(&self) -> &Matrix3<f64>;
     /**
@@ -54,8 +56,7 @@ pub trait LatticeTraits: Molecule {
             0.0,
             vol / (len_a * len_b * gamma.sin()),
         );
-        let to_frac = to_cart.try_inverse().unwrap();
-        to_frac
+        to_cart.try_inverse().unwrap()
     }
     /**
     Rotate the lattice to standard orientation.
@@ -82,7 +83,7 @@ pub trait LatticeTraits: Molecule {
         elm_list.extend(
             self.get_atoms()
                 .iter()
-                .map(|atom| (atom.element_name().to_string(), atom.element_id()))
+                .map(|atom| (atom.element_symbol().to_string(), atom.element_id()))
                 .collect::<Vec<(String, u32)>>()
                 .drain(..)
                 .collect::<HashSet<(String, u32)>>()

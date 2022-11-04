@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use super::YamlTable;
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
 pub struct ProjectInfo {
     base_model_loc: String,
     element_table_loc: String,
@@ -56,13 +56,13 @@ impl ProjectInfo {
         self.coord_cases.as_ref()
     }
 }
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
 pub struct CoordSite {
     name: String,
     atom_id: u32,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
 pub struct CoordCase {
     name: String,
     cases: Vec<(u32, Option<u32>)>,
@@ -70,7 +70,7 @@ pub struct CoordCase {
 
 impl CoordCase {
     pub fn get_cases(&self, reverse: bool) -> Vec<(u32, Option<u32>)> {
-        if reverse == true {
+        if reverse {
             let reversed_cases: Vec<(u32, Option<u32>)> = self
                 .cases
                 .iter()

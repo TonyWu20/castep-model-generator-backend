@@ -26,13 +26,6 @@ fn test_yaml() -> Result<(), Box<dyn Error>> {
     use crate::external_info::project::load_project_info;
     let project_info = load_project_info("resources/project.yaml")?;
     let table = ElmTab::load_table(project_info.element_table_loc()).unwrap();
-    println!("{}", table.elements.is_some());
-    table
-        .elements
-        .as_ref()
-        .unwrap()
-        .iter()
-        .for_each(|elm| println!("{:#?}", elm));
     let hashtab = table.hash_table()?;
     println!("{:#?}", hashtab.get("C").unwrap());
     let ads_table = AdsTab::load_table(project_info.adsorbate_table_loc())?;

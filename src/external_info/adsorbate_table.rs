@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use super::YamlTable;
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
 pub struct AdsInfo {
     name: String,
     #[serde(rename = "coordAtomIds")]
@@ -64,7 +64,7 @@ impl AdsInfo {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
 pub struct AdsTab {
     directory: String,
     #[serde(rename = "Adsorbates")]
