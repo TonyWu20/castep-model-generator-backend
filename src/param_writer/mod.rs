@@ -62,6 +62,17 @@ use MaterialsScript qw(:all);
         target_root_dir: &str,
         potentials_loc: &str,
     ) -> Result<(), Box<dyn Error>> {
+        let export_dir = self.export_destination(target_root_dir)?;
+        let msi_path = export_dir.join(&format!("{}.msi", self.get_lattice_name()));
+        if !msi_path.exists() {
+            let msi_content = self.output_in_msi();
+            fs::write(msi_path, msi_content)?;
+        } else {
+            let moved_dest = export_dir.join(&msi_path.file_name().unwrap());
+            if moved_dest.exists() == false {
+                fs::rename(&msi_path, moved_dest)?;
+            }
+        }
         let cell_path = self.export_filepath(target_root_dir, ".cell")?;
         fs::write(cell_path, self.cell_output())?;
         self.write_param(target_root_dir, potentials_loc)?;
@@ -71,20 +82,6 @@ use MaterialsScript qw(:all);
         self.copy_potentials(target_root_dir, potentials_loc)?;
         self.copy_smcastep_extension(target_root_dir)?;
         self.write_lsf_script(target_root_dir)?;
-        let export_dir = self.export_destination(target_root_dir)?;
-        let msi_path = export_dir
-            .parent()
-            .unwrap()
-            .join(&format!("{}.msi", self.get_lattice_name()));
-        if msi_path.exists() == false {
-            let msi_content = self.output_in_msi();
-            fs::write(msi_path, msi_content)?;
-        } else {
-            let moved_dest = export_dir.join(&msi_path.file_name().unwrap());
-            if moved_dest.exists() == false {
-                fs::rename(&msi_path, moved_dest)?;
-            }
-        }
         Ok(())
     }
     fn export_destination(&self, target_root_dir: &str) -> Result<PathBuf, Box<dyn Error>> {
