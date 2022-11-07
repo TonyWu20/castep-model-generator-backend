@@ -10,6 +10,7 @@ pub trait LatticeTraits: Molecule {
     fn get_lattice_name(&self) -> &str;
     /// Returns the lattice vectors in `Matrix3` type.
     fn get_lattice_vectors(&self) -> &Matrix3<f64>;
+    fn set_lattice_vectors(&mut self, new_lat_vec: Matrix3<f64>);
     /**
     Set the bool field `sorted` in the `Lattice` struct. Your `Lattice` struct must provide this field.
     The implementation depends on the specific name of the field given.
@@ -73,6 +74,8 @@ pub trait LatticeTraits: Molecule {
         }
         let rot_axis = a_vec.cross(&x_axis).normalize();
         let rot_quatd: UnitQuaternion<f64> = UnitQuaternion::new(rot_axis * a_to_x_angle);
+        let new_lat_vec = rot_quatd.to_rotation_matrix() * self.get_lattice_vectors();
+        self.set_lattice_vectors(new_lat_vec);
         self.get_mut_atoms()
             .iter_mut()
             .for_each(|atom| atom.rotate(&rot_quatd));
