@@ -64,7 +64,6 @@ use MaterialsScript qw(:all);
     ) -> Result<(), Box<dyn Error>> {
         let export_dir = self.export_destination(target_root_dir)?;
         let msi_path = export_dir.join(&format!("{}.msi", self.get_lattice_name()));
-        self.rotate_to_standard_orientation();
         if !msi_path.exists() {
             let msi_content = self.output_in_msi();
             fs::write(msi_path, msi_content)?;
@@ -74,6 +73,7 @@ use MaterialsScript qw(:all);
                 fs::rename(&msi_path, moved_dest)?;
             }
         }
+        self.rotate_to_standard_orientation();
         let cell_path = self.export_filepath(target_root_dir, ".cell")?;
         fs::write(cell_path, self.cell_output())?;
         self.write_param(target_root_dir, potentials_loc)?;
