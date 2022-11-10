@@ -1,39 +1,105 @@
 use std::collections::HashSet;
 
-use na::{Matrix3, UnitQuaternion, Vector, Vector3};
+use na::{Matrix3, Vector3};
 
-use crate::{molecule::Molecule, Transformation};
+use crate::{atom::Atom, error::InvalidIndex, model_type::ModelInfo};
 
-/// Common behaviours that a struct representing a `Lattice` should have.
-pub trait LatticeTraits: Molecule {
-    /// Returns the lattice name.
-    fn get_lattice_name(&self) -> &str;
-    /// Returns the lattice vectors in `Matrix3` type.
-    fn get_lattice_vectors(&self) -> &Matrix3<f64>;
-    fn set_lattice_vectors(&mut self, new_lat_vec: Matrix3<f64>);
-    /**
-    Set the bool field `sorted` in the `Lattice` struct. Your `Lattice` struct must provide this field.
-    The implementation depends on the specific name of the field given.
-    */
-    fn set_atoms_sorted(&mut self, is_sorted: bool);
-    /**
-    Return if the field `atoms` is sorted.
-    The implementation depends on the specific name of the field given.
-    */
-    fn is_atoms_sorted(&self) -> bool;
-    /// Sort the atoms in the order of atomic number.
-    fn sort_by_atomic_number(&mut self) {
-        let atoms = self.get_mut_atoms();
-        atoms.sort_unstable_by(|a, b| a.element_id().cmp(&b.element_id()));
-        self.set_atoms_sorted(true);
+#[derive(Debug, Clone)]
+pub struct LatticeModel<ModelType: ModelInfo> {
+    lattice_vectors: Option<LatticeVectors<ModelType>>,
+    atoms: Vec<Atom<ModelType>>,
+    model_type: ModelType,
+}
+
+impl<ModelType> LatticeModel<ModelType>
+where
+    ModelType: ModelInfo,
+{
+    pub fn new(
+        lattice_vectors: Option<LatticeVectors<ModelType>>,
+        atoms: Vec<Atom<ModelType>>,
+        model_type: ModelType,
+    ) -> Self {
+        Self {
+            lattice_vectors,
+            atoms,
+            model_type,
+        }
     }
-    /**
-    Returns the cartesian coordinate to fractional coordinate matrix.
-    It is relevant with the lattice vectors.
-    With default implementation.
-    */
-    fn fractional_coord_matrix(&self) -> Matrix3<f64> {
-        let lattice_vectors = self.get_lattice_vectors();
+
+    /// Returns the lattice vectors of this [`LatticeModel<ModelType>`].
+    pub fn lattice_vectors(&self) -> Option<&LatticeVectors<ModelType>> {
+        self.lattice_vectors.as_ref()
+    }
+    pub fn atoms(&self) -> &[Atom<ModelType>] {
+        self.atoms.as_ref()
+    }
+
+    pub fn model_type(&self) -> &ModelType {
+        &self.model_type
+    }
+
+    pub fn atoms_mut(&mut self) -> &mut Vec<Atom<ModelType>> {
+        &mut self.atoms
+    }
+    pub fn get_atom_by_id(&self, atom_id: u32) -> Result<&Atom<ModelType>, InvalidIndex> {
+        self.atoms().get(atom_id as usize - 1).ok_or(InvalidIndex)
+    }
+    pub fn get_mut_atom_by_id(
+        &mut self,
+        atom_id: u32,
+    ) -> Result<&mut Atom<ModelType>, InvalidIndex> {
+        self.atoms_mut()
+            .get_mut(atom_id as usize - 1)
+            .ok_or(InvalidIndex)
+    }
+    pub fn get_vector_ab(&self, a_id: u32, b_id: u32) -> Result<Vector3<f64>, InvalidIndex> {
+        let atom_a_xyz = self.get_atom_by_id(a_id)?.xyz();
+        let atom_b_xyz = self.get_atom_by_id(b_id)?.xyz();
+        Ok(atom_b_xyz - atom_a_xyz)
+    }
+    pub fn list_element(&self) -> Vec<String> {
+        let mut elm_list: Vec<(String, u32)> = vec![];
+        elm_list.extend(
+            self.atoms()
+                .iter()
+                .map(|atom| (atom.element_symbol().to_string(), atom.element_id()))
+                .collect::<Vec<(String, u32)>>()
+                .drain(..)
+                .collect::<HashSet<(String, u32)>>()
+                .into_iter(),
+        );
+        elm_list.sort_unstable_by(|a, b| {
+            let (_, id_a) = a;
+            let (_, id_b) = b;
+            id_a.cmp(id_b)
+        });
+        elm_list
+            .iter()
+            .map(|(name, _)| name.to_string())
+            .collect::<Vec<String>>()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LatticeVectors<ModelType: ModelInfo> {
+    vectors: Matrix3<f64>,
+    model_type: ModelType,
+}
+
+impl<ModelType> LatticeVectors<ModelType>
+where
+    ModelType: ModelInfo,
+{
+    pub fn new(vectors: Matrix3<f64>, model_type: ModelType) -> Self {
+        Self {
+            vectors,
+            model_type,
+        }
+    }
+
+    pub fn fractional_coord_matrix(&self) -> Matrix3<f64> {
+        let lattice_vectors = self.vectors();
         let vec_a = lattice_vectors.column(0);
         let vec_b = lattice_vectors.column(1);
         let vec_c = lattice_vectors.column(2);
@@ -59,47 +125,12 @@ pub trait LatticeTraits: Molecule {
         );
         to_cart.try_inverse().unwrap()
     }
-    /**
-    Rotate the lattice to standard orientation.
-    Example:
-    When the standard orientation is A-vector aligning with the x-axis,
-    the function will conduct the transformation for the atoms in the lattice.
-    */
-    fn rotate_to_standard_orientation(&mut self) {
-        let x_axis: Vector3<f64> = Vector::x();
-        let a_vec = self.get_lattice_vectors().column(0);
-        let a_to_x_angle = a_vec.angle(&x_axis);
-        if a_to_x_angle == 0.0 {
-            return;
-        }
-        let rot_axis = a_vec.cross(&x_axis).normalize();
-        let rot_quatd: UnitQuaternion<f64> = UnitQuaternion::new(rot_axis * a_to_x_angle);
-        let new_lat_vec = rot_quatd.to_rotation_matrix() * self.get_lattice_vectors();
-        self.set_lattice_vectors(new_lat_vec);
-        self.get_mut_atoms()
-            .iter_mut()
-            .for_each(|atom| atom.rotate(&rot_quatd));
+
+    pub fn vectors(&self) -> &Matrix3<f64> {
+        &self.vectors
     }
-    /// List the existing elements in the lattice, sorted by atomic number.
-    fn list_element(&self) -> Vec<String> {
-        let mut elm_list: Vec<(String, u32)> = vec![];
-        elm_list.extend(
-            self.get_atoms()
-                .iter()
-                .map(|atom| (atom.element_symbol().to_string(), atom.element_id()))
-                .collect::<Vec<(String, u32)>>()
-                .drain(..)
-                .collect::<HashSet<(String, u32)>>()
-                .into_iter(),
-        );
-        elm_list.sort_unstable_by(|a, b| {
-            let (_, id_a) = a;
-            let (_, id_b) = b;
-            id_a.cmp(id_b)
-        });
-        elm_list
-            .iter()
-            .map(|(name, _)| name.to_string())
-            .collect::<Vec<String>>()
+
+    pub fn model_type(&self) -> &ModelType {
+        &self.model_type
     }
 }

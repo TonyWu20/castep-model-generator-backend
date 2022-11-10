@@ -1,11 +1,10 @@
-use crate::Transformation;
-use ::core::fmt;
+use crate::{model_type::ModelInfo, Transformation};
 use std::cmp::Ordering;
 
 use na::Point3;
 /// Struct that defines an atom.
 #[derive(Debug, Clone)]
-pub struct Atom<Format> {
+pub struct Atom<ModelType: ModelInfo> {
     /// The symbol of the element.
     element_symbol: String,
     /// The atomic number of the element in periodic table.
@@ -14,24 +13,27 @@ pub struct Atom<Format> {
     xyz: Point3<f64>,
     /// The id of the atom in the parsed model.
     atom_id: u32,
-    format: Format,
+    model_type: ModelType,
 }
 
-impl<Format> Atom<Format> {
+impl<ModelType> Atom<ModelType>
+where
+    ModelType: ModelInfo,
+{
     /// Creates a new [`Atom`].
     pub fn new(
         element_symbol: String,
         element_id: u32,
         xyz: Point3<f64>,
         atom_id: u32,
-        format: Format,
+        model_type: ModelType,
     ) -> Self {
         Self {
             element_symbol,
             element_id,
             xyz,
             atom_id,
-            format,
+            model_type,
         }
     }
 
@@ -73,12 +75,12 @@ impl<Format> Atom<Format> {
     }
 
     /// Returns a reference to the format of this [`Atom<Format>`].
-    pub fn format(&self) -> &Format {
-        &self.format
+    pub fn model_type(&self) -> &ModelType {
+        &self.model_type
     }
     /// Sets the format of this [`Atom<Format>`].
-    pub fn set_format(&mut self, format: Format) {
-        self.format = format;
+    pub fn set_model_type(&mut self, model_type: ModelType) {
+        self.model_type = model_type;
     }
 }
 
@@ -89,7 +91,10 @@ impl<Format> Atom<Format> {
 //     }
 // }
 
-impl<Format> Transformation for Atom<Format> {
+impl<ModelType> Transformation for Atom<ModelType>
+where
+    ModelType: ModelInfo,
+{
     fn rotate(&mut self, rotate_quatd: &na::UnitQuaternion<f64>) {
         self.set_xyz(rotate_quatd.transform_point(self.xyz()))
     }
@@ -99,32 +104,31 @@ impl<Format> Transformation for Atom<Format> {
     }
 }
 
-impl<Format> fmt::Display for Atom<Format> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "Element: {}\nElement ID: {}\ncoord: {}\nAtom ID: {}",
-            self.element_symbol, self.element_id, self.xyz, self.atom_id
-        )
-    }
-}
-
-impl<Format> Ord for Atom<Format> {
+impl<ModelType> Ord for Atom<ModelType>
+where
+    ModelType: ModelInfo,
+{
     fn cmp(&self, other: &Self) -> Ordering {
         self.atom_id.cmp(&other.atom_id)
     }
 }
 
-impl<Format> PartialOrd for Atom<Format> {
+impl<ModelType> PartialOrd for Atom<ModelType>
+where
+    ModelType: ModelInfo,
+{
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<Format> PartialEq for Atom<Format> {
+impl<ModelType> PartialEq for Atom<ModelType>
+where
+    ModelType: ModelInfo,
+{
     fn eq(&self, other: &Self) -> bool {
         self.atom_id == other.atom_id
     }
 }
 
-impl<Format> Eq for Atom<Format> {}
+impl<ModelType> Eq for Atom<ModelType> where ModelType: ModelInfo {}

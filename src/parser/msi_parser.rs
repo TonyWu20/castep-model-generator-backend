@@ -11,54 +11,37 @@ use nom::{
 };
 
 use crate::atom::Atom;
+use crate::lattice::{LatticeModel, LatticeVectors};
+use crate::model_type::msi::MsiModel;
 
 use super::{decimal, float};
 extern crate nom;
 
-#[derive(Debug)]
-pub struct MsiModel {
-    lattice_vectors: Option<[[f64; 3]; 3]>,
-    atoms: Vec<Atom>,
-}
-
-impl MsiModel {
-    pub fn new(lattice_vectors: Option<[[f64; 3]; 3]>, atoms: Vec<Atom>) -> Self {
-        Self {
-            lattice_vectors,
-            atoms,
-        }
-    }
-
-    pub fn lattice_vectors(&self) -> Option<[[f64; 3]; 3]> {
-        self.lattice_vectors
-    }
-
-    pub fn atoms(&self) -> &[Atom] {
-        self.atoms.as_ref()
-    }
-}
-
-impl<'a> TryFrom<&'a str> for MsiModel {
+impl<'a> TryFrom<&'a str> for LatticeModel<MsiModel> {
     type Error = nom::Err<nom::error::Error<&'a str>>;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
         let (rest, _) = msi_model_start(value)?;
         let parse_lattice_vec = lattice_vector(rest);
-        match parse_lattice_vec {
-            Ok(res) => {
-                let (rest, lattice_vectors) = res;
-                let (rest, _) =
-                    preceded(alt((take_until("\r\n"), take_until("\n"))), line_ending)(rest)?;
-                let atoms_parsed = many1(parse_atom)(rest);
-                match atoms_parsed {
-                    Ok(atoms) => Ok(MsiModel::new(Some(lattice_vectors), atoms.1)),
-                    Err(e) => Err(e),
-                }
+        if let Ok(res) = parse_lattice_vec {
+            let (rest, lattice_vectors) = res;
+            let lattice_vector_flatten: Vec<f64> = lattice_vectors
+                .iter()
+                .flat_map(|slice| -> Vec<f64> { slice.to_vec() })
+                .collect();
+            let lattice_vector_matrix = na::Matrix3::from_vec(lattice_vector_flatten);
+            let lattice_vectors: LatticeVectors<MsiModel> =
+                LatticeVectors::new(lattice_vector_matrix, MsiModel);
+            let (rest, _) =
+                preceded(alt((take_until("\r\n"), take_until("\n"))), line_ending)(rest)?;
+            let atoms_parsed = many1(parse_atom)(rest);
+            match atoms_parsed {
+                Ok((_, atoms)) => Ok(LatticeModel::new(Some(lattice_vectors), atoms, MsiModel)),
+                Err(e) => Err(e),
             }
-            Err(_) => {
-                let (_, atoms) = many1(parse_atom)(rest)?;
-                Ok(MsiModel::new(None, atoms))
-            }
+        } else {
+            let (_, atoms) = many1(parse_atom)(rest)?;
+            Ok(LatticeModel::new(None, atoms, MsiModel))
         }
     }
 }
@@ -104,7 +87,7 @@ fn lattice_vector(input: &str) -> IResult<&str, [[f64; 3]; 3]> {
 
 /// Parse atom blocks in `msi` file format.
 /// Use space1 to handle 2/4 spaces cases. Use `line_ending` to handle `\n` (in unix-format) or `\r\n` (in dos-format)
-fn parse_atom<'b, 'a: 'b>(input: &'a str) -> IResult<&'a str, Atom> {
+fn parse_atom<'b, 'a: 'b>(input: &'a str) -> IResult<&'a str, Atom<MsiModel>> {
     // This gives the nth of `Atom` blocks.
     let (rest, _) = tuple((
         tuple((space1, tag("("))),
@@ -126,7 +109,7 @@ fn parse_atom<'b, 'a: 'b>(input: &'a str) -> IResult<&'a str, Atom> {
         separated_pair(decimal, char(' '), alpha1), // Example: (A C ACL "6 C")
         quoted_ending_block,
     )(rest)?;
-    let (element_id, element_name) = element_line;
+    let (element_id, element_symbol) = element_line;
     // Alternative cases: with a line of `Label` before `XYZ`, or without
     let (rest, xyz) = alt((
         preceded(
@@ -149,7 +132,13 @@ fn parse_atom<'b, 'a: 'b>(input: &'a str) -> IResult<&'a str, Atom> {
     let xyz = Point3::from_slice(&xyz);
     Ok((
         rest,
-        Atom::new(element_name.to_string(), element_id, xyz, atom_id),
+        Atom::new(
+            element_symbol.to_string(),
+            element_id,
+            xyz,
+            atom_id,
+            MsiModel,
+        ),
     ))
 }
 
@@ -158,15 +147,28 @@ fn parse_atom<'b, 'a: 'b>(input: &'a str) -> IResult<&'a str, Atom> {
 fn test_msi() {
     use std::fs::read_to_string;
 
+    use crate::model_type::{cell::CellModel, ModelInfo};
+    #[derive(Debug)]
+    struct GDYLattice<T: ModelInfo> {
+        lattice: LatticeModel<T>,
+        name: String,
+    }
+
     let test_flaw = read_to_string("COOH.msi").unwrap();
     // let (rest, _) = msi_model_start(&test_flaw).unwrap();
     // let (rest, atom) = many1(parse_atom)(rest).unwrap();
-    let ad = MsiModel::try_from(test_flaw.as_str());
+    let ad = LatticeModel::try_from(test_flaw.as_str());
     match ad {
         Ok(ad) => println!("{:?}", ad),
         Err(e) => println!("{}", e),
     }
     let test_lat = read_to_string("SAC_GDY_Ag.msi").unwrap();
-    let lat = MsiModel::try_from(test_lat.as_str()).unwrap();
-    println!("{:?}", lat);
+    let lat = LatticeModel::try_from(test_lat.as_str()).unwrap();
+    let cell: LatticeModel<CellModel> = LatticeModel::from(lat.clone());
+    let gdy_ag_lat = GDYLattice {
+        lattice: lat,
+        name: "SAC_GDY_Ag.msi".to_string(),
+    };
+    println!("{:#?}", gdy_ag_lat);
+    println!("{}", cell.cell_export());
 }

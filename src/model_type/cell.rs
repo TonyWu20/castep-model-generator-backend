@@ -2,14 +2,17 @@ use std::fmt::Display;
 
 use crate::{
     atom::Atom,
-    lattice::{LatticeModel, LatticeTraits, LatticeVectors},
+    lattice::{LatticeModel, LatticeVectors},
 };
 
 use cpt::{data::ELEMENT_TABLE, element::LookupElement};
+use na::{UnitQuaternion, Vector, Vector3};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+use super::{msi::MsiModel, ModelInfo};
+
+#[derive(Clone, Debug, PartialEq)]
 /// Struct to represent `cell`format.
-pub struct CellFormat {
+pub struct CellModel {
     /// List of k-points. Each k-point has xyz and a weight factor.
     kpoints_list: Vec<[f64; 4]>,
     /// Option in `IONIC_CONSTRAINTS`
@@ -21,8 +24,10 @@ pub struct CellFormat {
     external_pressure: [f64; 6],
 }
 
+impl ModelInfo for CellModel {}
+
 /// Default `CellFormat` values
-impl Default for CellFormat {
+impl Default for CellModel {
     fn default() -> Self {
         Self {
             kpoints_list: vec![[0.0, 0.0, 0.0, 1.0]],
@@ -35,7 +40,7 @@ impl Default for CellFormat {
 }
 
 /// Methods for `CellFormat`
-impl CellFormat {
+impl CellModel {
     fn write_block(block: (String, String)) -> String {
         let (block_name, content) = block;
         format!(
@@ -45,8 +50,42 @@ impl CellFormat {
     }
 }
 
+/// Transition from `LatticeModel<MsiFormat>` to `LatticeModel<CellFormat>`
+impl From<LatticeModel<MsiModel>> for LatticeModel<CellModel> {
+    fn from(msi_model: LatticeModel<MsiModel>) -> Self {
+        let x_axis: Vector3<f64> = Vector::x();
+        let a_vec = msi_model.lattice_vectors().unwrap().vectors().column(0);
+        let a_to_x_angle = a_vec.angle(&x_axis);
+        let rot_axis = a_vec.cross(&x_axis).normalize();
+        let rot_quatd: UnitQuaternion<f64> = UnitQuaternion::new(rot_axis * a_to_x_angle);
+        let new_lat_vec =
+            rot_quatd.to_rotation_matrix() * msi_model.lattice_vectors().unwrap().vectors();
+        let new_lat_vec = LatticeVectors::new(new_lat_vec, CellModel::default());
+        let mut msi_atoms = msi_model.atoms().to_owned();
+        let fractional_coord_matrix = msi_model
+            .lattice_vectors()
+            .unwrap()
+            .fractional_coord_matrix();
+        let cell_atoms = msi_atoms
+            .iter_mut()
+            .map(|atom| {
+                let rotated_coord = rot_quatd.transform_point(atom.xyz());
+                let fractional_coord = fractional_coord_matrix * rotated_coord;
+                Atom::new(
+                    atom.element_symbol().to_string(),
+                    atom.element_id(),
+                    fractional_coord,
+                    atom.atom_id(),
+                    CellModel::default(),
+                )
+            })
+            .collect();
+        Self::new(Some(new_lat_vec), cell_atoms, CellModel::default())
+    }
+}
+
 /// Methods only for `LatticeModel<CellFormat>`
-impl LatticeModel<CellFormat> {
+impl LatticeModel<CellModel> {
     /// Formatted *fractional coordinates*
     fn positions_str(&self) -> String {
         let coords_strings: Vec<String> = self
@@ -55,7 +94,7 @@ impl LatticeModel<CellFormat> {
             .map(|atom| format!("{}", atom))
             .collect();
         let coords = coords_strings.concat();
-        CellFormat::write_block(("POSITIONS_FRAC".to_string(), coords))
+        CellModel::write_block(("POSITIONS_FRAC".to_string(), coords))
     }
     /**
     This data block contains a list of k-points at which the Brillouin zone will be sampled during a self consistent calculation to find the electronic ground state, along with the associated weights
@@ -74,7 +113,7 @@ impl LatticeModel<CellFormat> {
     */
     fn kpoints_list_str(&self) -> String {
         let kpoints_list: Vec<String> = self
-            .format()
+            .model_type()
             .kpoints_list
             .iter()
             .map(|kpoint| {
@@ -82,32 +121,32 @@ impl LatticeModel<CellFormat> {
                 format!("{:20.16}{:20.16}{:20.16}{:20.16}\n", x, y, z, weight)
             })
             .collect();
-        CellFormat::write_block(("KPOINTS_LIST".to_string(), kpoints_list.concat()))
+        CellModel::write_block(("KPOINTS_LIST".to_string(), kpoints_list.concat()))
     }
     /// No constraints. Future: adapt to settings
     fn ionic_constraints(&self) -> String {
-        CellFormat::write_block(("IONIC_CONSTRAINTS".to_string(), "".to_string()))
+        CellModel::write_block(("IONIC_CONSTRAINTS".to_string(), "".to_string()))
     }
     /// Miscellaneous parameters
     fn misc_options(&self) -> String {
         let fix = format!(
             "FIX_ALL_CELL : {}\n\nFIX_COM : {}\n{}",
-            self.format().fix_all_cell,
-            self.format().fix_com,
+            self.model_type().fix_all_cell,
+            self.model_type().fix_com,
             self.ionic_constraints()
         );
-        let [ex, ey, ez] = self.format().external_efield;
-        let external_efield = CellFormat::write_block((
+        let [ex, ey, ez] = self.model_type().external_efield;
+        let external_efield = CellModel::write_block((
             "EXTERNAL_EFIELD".to_string(),
             format!("{:16.10}{:16.10}{:16.10}\n", ex, ey, ez),
         ));
-        let [rxx, rxy, rxz, ryy, ryz, rzz] = self.format().external_pressure;
-        let external_pressure = CellFormat::write_block((
+        let [rxx, rxy, rxz, ryy, ryz, rzz] = self.model_type().external_pressure;
+        let external_pressure = CellModel::write_block((
             "EXTERNAL_PRESSURE".to_string(),
             format!(
                 r#"{:16.10}{:16.10}{:16.10}
                 {:16.10}{:16.10}
-                                    {:16.10}
+                                {:16.10}
 "#,
                 rxx, rxy, rxz, ryy, ryz, rzz
             ),
@@ -139,7 +178,7 @@ impl LatticeModel<CellFormat> {
                 format!("{:>8}{:17.10}\n", elm, mass)
             })
             .collect();
-        CellFormat::write_block(("SPECIES_MASS".to_string(), mass_strings.concat()))
+        CellModel::write_block(("SPECIES_MASS".to_string(), mass_strings.concat()))
     }
     /**
     Species and potential table
@@ -153,7 +192,7 @@ impl LatticeModel<CellFormat> {
     %ENDBLOCK SPECIES_POT
     ```
     */
-    fn species_pot_str(&self) -> (String, String) {
+    fn species_pot_str(&self) -> String {
         let element_list = self.list_element();
         let pot_strings: Vec<String> = element_list
             .iter()
@@ -162,7 +201,7 @@ impl LatticeModel<CellFormat> {
                 format!("{:>8}  {}\n", elm, pot_file)
             })
             .collect();
-        CellFormat::write_block(("SPECIES_POT".to_string(), pot_strings.concat()))
+        CellModel::write_block(("SPECIES_POT".to_string(), pot_strings.concat()))
     }
     /**
     This data block defines the size of the LCAO basis set used for population analysis.
@@ -176,7 +215,7 @@ impl LatticeModel<CellFormat> {
     %ENDBLOCK SPECIES_LCAO_STATES
     ```
     */
-    fn species_lcao_str(&self) -> (String, String) {
+    fn species_lcao_str(&self) -> String {
         let element_list = self.list_element();
         let lcao_strings: Vec<String> = element_list
             .iter()
@@ -185,10 +224,10 @@ impl LatticeModel<CellFormat> {
                 format!("{:>8}{:9}\n", elm, lcao_state)
             })
             .collect();
-        CellFormat::write_block(("SPECIES_LCAO_STATES".to_string(), lcao_strings.concat()))
+        CellModel::write_block(("SPECIES_LCAO_STATES".to_string(), lcao_strings.concat()))
     }
     pub fn cell_export(&self) -> String {
-        let lattice_vector_string = format!("{}", self.lattice_vectors());
+        let lattice_vector_string = format!("{}", self.lattice_vectors().unwrap());
         let cell_text = vec![
             lattice_vector_string,
             self.positions_str(),
@@ -202,7 +241,7 @@ impl LatticeModel<CellFormat> {
     }
 }
 
-impl Display for Atom<CellFormat> {
+impl Display for Atom<CellModel> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let atom_element = self.element_symbol();
         let spin = ELEMENT_TABLE.get_by_symbol(atom_element).unwrap().spin();
@@ -229,7 +268,7 @@ impl Display for Atom<CellFormat> {
     }
 }
 
-impl Display for LatticeVectors<CellFormat> {
+impl Display for LatticeVectors<CellModel> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let formatted_vector: Vec<String> = self
             .vectors()
@@ -237,9 +276,7 @@ impl Display for LatticeVectors<CellFormat> {
             .map(|col| format!("{:24.18}{:24.18}{:24.18}\n", col.x, col.y, col.z))
             .collect();
         let formatted_vector = formatted_vector.concat();
-        let output = self
-            .format
-            .write_block(("LATTICE_CART".to_string(), formatted_vector));
+        let output = CellModel::write_block(("LATTICE_CART".to_string(), formatted_vector));
         write!(f, "{}", &output)
     }
 }
