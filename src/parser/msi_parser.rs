@@ -31,13 +31,17 @@ impl<'a> TryFrom<&'a str> for LatticeModel<MsiModel> {
                 .collect();
             let lattice_vector_matrix = na::Matrix3::from_vec(lattice_vector_flatten);
             let lattice_vectors: LatticeVectors<MsiModel> =
-                LatticeVectors::new(lattice_vector_matrix, MsiModel);
+                LatticeVectors::new(lattice_vector_matrix, MsiModel::default());
             let (rest, _) = skip_to_atoms(rest)?;
             let (_, atoms) = many1(parse_atom)(rest)?;
-            Ok(LatticeModel::new(Some(lattice_vectors), atoms, MsiModel))
+            Ok(LatticeModel::new(
+                Some(lattice_vectors),
+                atoms,
+                MsiModel::default(),
+            ))
         } else {
             let (_, atoms) = many1(parse_atom)(rest)?;
-            Ok(LatticeModel::new(None, atoms, MsiModel))
+            Ok(LatticeModel::new(None, atoms, MsiModel::default()))
         }
     }
 }
@@ -136,7 +140,7 @@ fn parse_atom<'b, 'a: 'b>(input: &'a str) -> IResult<&'a str, Atom<MsiModel>> {
             element_id,
             xyz,
             atom_id,
-            MsiModel,
+            MsiModel::default(),
         ),
     ))
 }
