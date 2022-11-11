@@ -2,7 +2,6 @@
 use std::{collections::HashMap, error::Error, path::Path};
 
 pub mod adsorbate_table;
-pub mod element_table;
 pub mod project;
 
 /// Trait for adsorbate and element yaml table.
@@ -22,12 +21,8 @@ pub trait YamlTable {
 #[test]
 fn test_yaml() -> Result<(), Box<dyn Error>> {
     use crate::external_info::adsorbate_table::AdsTab;
-    use crate::external_info::element_table::ElmTab;
     use crate::external_info::project::load_project_info;
     let project_info = load_project_info("resources/project.yaml")?;
-    let table = ElmTab::load_table(project_info.element_table_loc()).unwrap();
-    let hashtab = table.hash_table()?;
-    println!("{:#?}", hashtab.get("C").unwrap());
     let ads_table = AdsTab::load_table(project_info.adsorbate_table_loc())?;
     assert!(ads_table.adsorbates().is_some());
     let hash_ads_tab = ads_table.hash_table()?;
@@ -38,12 +33,5 @@ fn test_yaml() -> Result<(), Box<dyn Error>> {
     println!("{:?}", project_info);
     let coord_sites_dict = project_info.hash_coord_site();
     println!("{}", coord_sites_dict.get(&41).unwrap());
-    let elements: Vec<element_table::Element> = table
-        .elements()
-        .unwrap()
-        .iter()
-        .map(|elm| elm.clone())
-        .collect();
-    println!("{:?}", elements);
     Ok(())
 }

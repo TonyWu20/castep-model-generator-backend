@@ -32,13 +32,9 @@ impl<'a> TryFrom<&'a str> for LatticeModel<MsiModel> {
             let lattice_vector_matrix = na::Matrix3::from_vec(lattice_vector_flatten);
             let lattice_vectors: LatticeVectors<MsiModel> =
                 LatticeVectors::new(lattice_vector_matrix, MsiModel);
-            let (rest, _) =
-                preceded(alt((take_until("\r\n"), take_until("\n"))), line_ending)(rest)?;
-            let atoms_parsed = many1(parse_atom)(rest);
-            match atoms_parsed {
-                Ok((_, atoms)) => Ok(LatticeModel::new(Some(lattice_vectors), atoms, MsiModel)),
-                Err(e) => Err(e),
-            }
+            let (rest, _) = skip_to_atoms(rest)?;
+            let (_, atoms) = many1(parse_atom)(rest)?;
+            Ok(LatticeModel::new(Some(lattice_vectors), atoms, MsiModel))
         } else {
             let (_, atoms) = many1(parse_atom)(rest)?;
             Ok(LatticeModel::new(None, atoms, MsiModel))
@@ -52,6 +48,9 @@ fn msi_model_start(input: &str) -> IResult<&str, &str> {
         preceded(take_until("(1 Model\r\n"), tag("(1 Model\r\n")),
         preceded(take_until("(1 Model\n"), tag("(1 Model\n")),
     ))(input)
+}
+fn skip_to_atoms(input: &str) -> IResult<&str, &str> {
+    preceded(alt((take_until("\r\n"), take_until("\n"))), line_ending)(input)
 }
 
 /// Parse XYZ in `msi` file. Since it possibly write `0` instead of `0.0`, we have to parse with `alt((float, decimal))`
@@ -145,7 +144,7 @@ fn parse_atom<'b, 'a: 'b>(input: &'a str) -> IResult<&'a str, Atom<MsiModel>> {
 #[cfg(test)]
 #[test]
 fn test_msi() {
-    use std::fs::read_to_string;
+    use std::fs::{read_to_string, write};
 
     use crate::model_type::{cell::CellModel, ModelInfo};
     #[derive(Debug)]
@@ -154,14 +153,6 @@ fn test_msi() {
         name: String,
     }
 
-    let test_flaw = read_to_string("COOH.msi").unwrap();
-    // let (rest, _) = msi_model_start(&test_flaw).unwrap();
-    // let (rest, atom) = many1(parse_atom)(rest).unwrap();
-    let ad = LatticeModel::try_from(test_flaw.as_str());
-    match ad {
-        Ok(ad) => println!("{:?}", ad),
-        Err(e) => println!("{}", e),
-    }
     let test_lat = read_to_string("SAC_GDY_Ag.msi").unwrap();
     let lat = LatticeModel::try_from(test_lat.as_str()).unwrap();
     let cell: LatticeModel<CellModel> = LatticeModel::from(lat.clone());
@@ -170,5 +161,5 @@ fn test_msi() {
         name: "SAC_GDY_Ag.msi".to_string(),
     };
     println!("{:#?}", gdy_ag_lat);
-    println!("{}", cell.cell_export());
+    write("SAC_GDY_Ag.cell", cell.cell_export()).unwrap();
 }

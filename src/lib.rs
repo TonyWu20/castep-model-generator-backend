@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
-// pub mod assemble;
+pub mod adsorbate;
+pub mod assemble;
 pub mod atom;
 pub mod error;
 pub mod external_info;

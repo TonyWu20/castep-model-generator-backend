@@ -3,6 +3,7 @@ use std::fmt::Display;
 use crate::{
     atom::Atom,
     lattice::{LatticeModel, LatticeVectors},
+    Transformation,
 };
 
 use cpt::{data::ELEMENT_TABLE, element::LookupElement};
@@ -52,15 +53,17 @@ impl CellModel {
 
 /// Transition from `LatticeModel<MsiFormat>` to `LatticeModel<CellFormat>`
 impl From<LatticeModel<MsiModel>> for LatticeModel<CellModel> {
-    fn from(msi_model: LatticeModel<MsiModel>) -> Self {
+    fn from(mut msi_model: LatticeModel<MsiModel>) -> Self {
         let x_axis: Vector3<f64> = Vector::x();
         let a_vec = msi_model.lattice_vectors().unwrap().vectors().column(0);
         let a_to_x_angle = a_vec.angle(&x_axis);
         let rot_axis = a_vec.cross(&x_axis).normalize();
         let rot_quatd: UnitQuaternion<f64> = UnitQuaternion::new(rot_axis * a_to_x_angle);
-        let new_lat_vec =
-            rot_quatd.to_rotation_matrix() * msi_model.lattice_vectors().unwrap().vectors();
-        let new_lat_vec = LatticeVectors::new(new_lat_vec, CellModel::default());
+        msi_model.rotate(&rot_quatd);
+        let new_lat_vec = LatticeVectors::new(
+            msi_model.lattice_vectors().unwrap().vectors().to_owned(),
+            CellModel::default(),
+        );
         let mut msi_atoms = msi_model.atoms().to_owned();
         let fractional_coord_matrix = msi_model
             .lattice_vectors()
@@ -69,8 +72,7 @@ impl From<LatticeModel<MsiModel>> for LatticeModel<CellModel> {
         let cell_atoms = msi_atoms
             .iter_mut()
             .map(|atom| {
-                let rotated_coord = rot_quatd.transform_point(atom.xyz());
-                let fractional_coord = fractional_coord_matrix * rotated_coord;
+                let fractional_coord = fractional_coord_matrix * atom.xyz();
                 Atom::new(
                     atom.element_symbol().to_string(),
                     atom.element_id(),
@@ -246,9 +248,9 @@ impl Display for Atom<CellModel> {
         let atom_element = self.element_symbol();
         let spin = ELEMENT_TABLE.get_by_symbol(atom_element).unwrap().spin();
         if spin > 0 {
-            write!(
+            writeln!(
                 f,
-                "{:>3}{:20.16}{:20.16}{:20.16} SPIN={:14.10}\n",
+                "{:>3}{:20.16}{:20.16}{:20.16} SPIN={:14.10}",
                 atom_element,
                 self.xyz().x,
                 self.xyz().y,
@@ -256,9 +258,9 @@ impl Display for Atom<CellModel> {
                 spin as f64
             )
         } else {
-            write!(
+            writeln!(
                 f,
-                "{:>3}{:20.16}{:20.16}{:20.16}\n",
+                "{:>3}{:20.16}{:20.16}{:20.16}",
                 atom_element,
                 self.xyz().x,
                 self.xyz().y,

@@ -2,23 +2,23 @@ use std::collections::HashSet;
 
 use na::{Matrix3, Vector3};
 
-use crate::{atom::Atom, error::InvalidIndex, model_type::ModelInfo};
+use crate::{atom::Atom, error::InvalidIndex, model_type::ModelInfo, Transformation};
 
 #[derive(Debug, Clone)]
-pub struct LatticeModel<ModelType: ModelInfo> {
-    lattice_vectors: Option<LatticeVectors<ModelType>>,
-    atoms: Vec<Atom<ModelType>>,
-    model_type: ModelType,
+pub struct LatticeModel<T: ModelInfo> {
+    lattice_vectors: Option<LatticeVectors<T>>,
+    atoms: Vec<Atom<T>>,
+    model_type: T,
 }
 
-impl<ModelType> LatticeModel<ModelType>
+impl<T> LatticeModel<T>
 where
-    ModelType: ModelInfo,
+    T: ModelInfo,
 {
     pub fn new(
-        lattice_vectors: Option<LatticeVectors<ModelType>>,
-        atoms: Vec<Atom<ModelType>>,
-        model_type: ModelType,
+        lattice_vectors: Option<LatticeVectors<T>>,
+        atoms: Vec<Atom<T>>,
+        model_type: T,
     ) -> Self {
         Self {
             lattice_vectors,
@@ -27,28 +27,25 @@ where
         }
     }
 
-    /// Returns the lattice vectors of this [`LatticeModel<ModelType>`].
-    pub fn lattice_vectors(&self) -> Option<&LatticeVectors<ModelType>> {
+    /// Returns the lattice vectors of this [`LatticeModel<T>`].
+    pub fn lattice_vectors(&self) -> Option<&LatticeVectors<T>> {
         self.lattice_vectors.as_ref()
     }
-    pub fn atoms(&self) -> &[Atom<ModelType>] {
+    pub fn atoms(&self) -> &[Atom<T>] {
         self.atoms.as_ref()
     }
 
-    pub fn model_type(&self) -> &ModelType {
+    pub fn model_type(&self) -> &T {
         &self.model_type
     }
 
-    pub fn atoms_mut(&mut self) -> &mut Vec<Atom<ModelType>> {
+    pub fn atoms_mut(&mut self) -> &mut Vec<Atom<T>> {
         &mut self.atoms
     }
-    pub fn get_atom_by_id(&self, atom_id: u32) -> Result<&Atom<ModelType>, InvalidIndex> {
+    pub fn get_atom_by_id(&self, atom_id: u32) -> Result<&Atom<T>, InvalidIndex> {
         self.atoms().get(atom_id as usize - 1).ok_or(InvalidIndex)
     }
-    pub fn get_mut_atom_by_id(
-        &mut self,
-        atom_id: u32,
-    ) -> Result<&mut Atom<ModelType>, InvalidIndex> {
+    pub fn get_mut_atom_by_id(&mut self, atom_id: u32) -> Result<&mut Atom<T>, InvalidIndex> {
         self.atoms_mut()
             .get_mut(atom_id as usize - 1)
             .ok_or(InvalidIndex)
@@ -79,19 +76,35 @@ where
             .map(|(name, _)| name.to_string())
             .collect::<Vec<String>>()
     }
+
+    pub fn lattice_vectors_mut(&mut self) -> &mut Option<LatticeVectors<T>> {
+        &mut self.lattice_vectors
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct LatticeVectors<ModelType: ModelInfo> {
+pub struct LatticeVectors<T: ModelInfo> {
     vectors: Matrix3<f64>,
-    model_type: ModelType,
+    model_type: T,
 }
 
-impl<ModelType> LatticeVectors<ModelType>
+impl<T> Transformation for LatticeVectors<T>
 where
-    ModelType: ModelInfo,
+    T: ModelInfo,
 {
-    pub fn new(vectors: Matrix3<f64>, model_type: ModelType) -> Self {
+    fn rotate(&mut self, rotate_quatd: &na::UnitQuaternion<f64>) {
+        let new_vectors = rotate_quatd.to_rotation_matrix() * self.vectors();
+        self.set_vectors(new_vectors)
+    }
+
+    fn translate(&mut self, _translate_matrix: &na::Translation<f64, 3>) {}
+}
+
+impl<T> LatticeVectors<T>
+where
+    T: ModelInfo,
+{
+    pub fn new(vectors: Matrix3<f64>, model_type: T) -> Self {
         Self {
             vectors,
             model_type,
@@ -130,7 +143,31 @@ where
         &self.vectors
     }
 
-    pub fn model_type(&self) -> &ModelType {
+    pub fn model_type(&self) -> &T {
         &self.model_type
+    }
+
+    pub fn set_vectors(&mut self, vectors: Matrix3<f64>) {
+        self.vectors = vectors;
+    }
+}
+
+impl<T> Transformation for LatticeModel<T>
+where
+    T: ModelInfo,
+{
+    fn rotate(&mut self, rotate_quatd: &na::UnitQuaternion<f64>) {
+        self.atoms_mut()
+            .iter_mut()
+            .for_each(|atom| atom.rotate(rotate_quatd));
+        if let Some(lattice_vectors) = self.lattice_vectors_mut() {
+            lattice_vectors.rotate(rotate_quatd);
+        }
+    }
+
+    fn translate(&mut self, translate_matrix: &na::Translation<f64, 3>) {
+        self.atoms_mut()
+            .iter_mut()
+            .for_each(|atom| atom.translate(translate_matrix));
     }
 }
