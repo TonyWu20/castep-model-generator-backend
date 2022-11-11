@@ -1,11 +1,28 @@
 use std::fmt::Display;
 
-use crate::{atom::Atom, lattice::LatticeVectors};
+use crate::{
+    atom::Atom,
+    lattice::{LatticeModel, LatticeVectors},
+};
 
 use super::ModelInfo;
 
-#[derive(Debug, Clone, Default)]
-pub struct MsiModel;
+#[derive(Debug, Clone)]
+pub struct MsiModel {
+    periodic_type: u8,
+    space_group: String,
+    cry_tolerance: f64,
+}
+
+impl Default for MsiModel {
+    fn default() -> Self {
+        Self {
+            periodic_type: 100_u8,
+            space_group: "1 1".to_string(),
+            cry_tolerance: 0.05,
+        }
+    }
+}
 
 impl ModelInfo for MsiModel {}
 
@@ -47,9 +64,37 @@ impl Display for LatticeVectors<MsiModel> {
             vector_b.x, vector_b.y, vector_b.z
         );
         let vector_c_line = format!(
-            "  (A D C3 ({:.12} {:.12} {:.12}))\n",
+            "  (A D C3 ({:.12} {:.12} {:.12}))",
             vector_c.x, vector_c.y, vector_c.z
         );
-        write!(f, "{vector_a_line}{vector_b_line}{vector_c_line}")
+        writeln!(f, "{vector_a_line}{vector_b_line}{vector_c_line}")
+    }
+}
+
+impl LatticeModel<MsiModel> {
+    pub fn msi_export(&self) -> String {
+        let atoms_output: Vec<String> = self
+            .atoms()
+            .iter()
+            .map(|atom| format!("{}", atom))
+            .collect();
+        if let Some(lattice_vectors) = self.lattice_vectors() {
+            let headers_vectors: Vec<String> = vec![
+                "# MSI CERIUS2 DataModel File Version 4 0\n".to_string(),
+                "(1 Model\n".to_string(),
+                "  (A I CRY/DISPLAY (192 256))\n".to_string(),
+                format!("  (A I PeriodicType {})\n", self.model_type().periodic_type),
+                format!("  (A C SpaceGroup \"{}\")\n", self.model_type().space_group),
+                format!("{}", lattice_vectors),
+                format!(
+                    "  (A D CRY/TOLERANCE {})\n",
+                    self.model_type().cry_tolerance
+                ),
+            ];
+            format!("{}{})", headers_vectors.concat(), atoms_output.concat())
+        } else {
+            let headers = "# MSI CERIUS2 DataModel File Version 4 0\n(1 Model\n";
+            format!("{}{})", headers, atoms_output.concat())
+        }
     }
 }
