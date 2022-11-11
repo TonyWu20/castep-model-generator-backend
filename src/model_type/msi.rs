@@ -14,6 +14,20 @@ pub struct MsiModel {
     cry_tolerance: f64,
 }
 
+impl MsiModel {
+    pub fn periodic_type(&self) -> u8 {
+        self.periodic_type
+    }
+
+    pub fn space_group(&self) -> &str {
+        self.space_group.as_ref()
+    }
+
+    pub fn cry_tolerance(&self) -> f64 {
+        self.cry_tolerance
+    }
+}
+
 impl Default for MsiModel {
     fn default() -> Self {
         Self {
@@ -83,12 +97,18 @@ impl LatticeModel<MsiModel> {
                 "# MSI CERIUS2 DataModel File Version 4 0\n".to_string(),
                 "(1 Model\n".to_string(),
                 "  (A I CRY/DISPLAY (192 256))\n".to_string(),
-                format!("  (A I PeriodicType {})\n", self.model_type().periodic_type),
-                format!("  (A C SpaceGroup \"{}\")\n", self.model_type().space_group),
+                format!(
+                    "  (A I PeriodicType {})\n",
+                    self.model_type().periodic_type()
+                ),
+                format!(
+                    "  (A C SpaceGroup \"{}\")\n",
+                    self.model_type().space_group()
+                ),
                 format!("{}", lattice_vectors),
                 format!(
                     "  (A D CRY/TOLERANCE {})\n",
-                    self.model_type().cry_tolerance
+                    self.model_type().cry_tolerance()
                 ),
             ];
             format!("{}{})", headers_vectors.concat(), atoms_output.concat())
