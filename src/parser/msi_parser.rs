@@ -152,18 +152,25 @@ fn test_msi() {
 
     use crate::model_type::{cell::CellModel, ModelInfo};
     #[derive(Debug)]
-    struct GDYLattice<T: ModelInfo> {
+    struct GDYLattice<T: ModelInfo + Clone> {
         lattice: LatticeModel<T>,
         name: String,
     }
 
+    impl<T: ModelInfo + Clone> GDYLattice<T> {
+        fn lattice(&self) -> &LatticeModel<T> {
+            &self.lattice
+        }
+    }
+
     let test_lat = read_to_string("SAC_GDY_Ag.msi").unwrap();
-    let lat = LatticeModel::try_from(test_lat.as_str()).unwrap();
+    let lat = LatticeModel::<MsiModel>::try_from(test_lat.as_str()).unwrap();
     let cell: LatticeModel<CellModel> = LatticeModel::from(lat.clone());
     let gdy_ag_lat = GDYLattice {
         lattice: lat,
         name: "SAC_GDY_Ag.msi".to_string(),
     };
-    println!("{:#?}", gdy_ag_lat);
+    let msi_export = gdy_ag_lat.lattice().msi_export();
+    println!("{}", msi_export);
     write("SAC_GDY_Ag.cell", cell.cell_export()).unwrap();
 }

@@ -1,67 +1,34 @@
 #[cfg(test)]
 mod test {
+    use std::fs::{read_to_string, write};
 
-    // #[test]
-    // fn test_parse_ads() -> Result<(), Box<dyn Error>> {
-    //     let ads_table = AdsTab::load_table("./resources/ads_table.yaml")?;
-    //     let parent_dir = ads_table.directory().to_string();
-    //     let hash_table = ads_table.hash_table()?;
-    //     let ads_info = hash_table.get("CH2CHOH").unwrap();
-    //     let parsed_ads = parse_adsorbate(ads_info, &parent_dir)?;
-    //     println!("{:?}", parsed_ads.atoms_vec());
-    //     Ok(())
-    // }
-    // #[test]
-    // fn add_ads_to_lat() -> Result<(), Box<dyn Error>> {
-    //     let filename = "./resources/GDY_tri.msi";
-    //     let base_lat: Lattice = parser::msi_parser::parse_lattice(filename)?;
-    //     // change_atom_element(
-    //     //     base_lat.atoms_vec_mut().get_mut_atom_by_id(73).unwrap(),
-    //     //     "Mn",
-    //     //     25,
-    //     // );
-    //     // change_atom_element(
-    //     //     base_lat.atoms_vec_mut().get_mut_atom_by_id(74).unwrap(),
-    //     //     "Mn",
-    //     //     25,
-    //     // );
-    //     // change_atom_element(
-    //     //     base_lat.atoms_vec_mut().get_mut_atom_by_id(75).unwrap(),
-    //     //     "Ni",
-    //     //     28,
-    //     // );
-    //     // // let frac_mat = fractional_coord_matrix(&base_lat);
-    //     // base_lat.update_base_name();
-    //     let ads_table = AdsTab::load_table("./resources/ads_table.yaml")?;
-    //     let parent_dir = ads_table.directory().to_string();
-    //     let hash_table = ads_table.hash_table()?;
-    //     let ads_info = hash_table.get("CH2CHOH").unwrap();
-    //     let mut parsed_ads = parse_adsorbate(ads_info, &parent_dir)?;
-    //     let project_info = load_project_info("./resources/project.yaml")?;
-    //     let coord_site_dict = project_info.hash_coord_site();
-    //     let coord_cases = &project_info.coord_cases()[0];
-    //     let element_table = element_table::ElmTab::load_table("./resources/element_table.yaml")?;
-    //     let element_info = element_table.hash_table()?;
-    //     coord_cases
-    //         .get_cases(false)
-    //         .iter()
-    //         .try_for_each(|case| -> Result<(), Box<dyn Error>> {
-    //             let mut new_lat = base_lat.clone();
-    //             new_lat.add_ads(
-    //                 &mut parsed_ads,
-    //                 case.0,
-    //                 case.1,
-    //                 1.4,
-    //                 false,
-    //                 &coord_site_dict,
-    //             )?;
-    //             let result = new_lat.format_output();
-    //             let cell = new_lat.cell_output(&element_info);
-    //             let cell_name = new_lat.lattice_name();
-    //             fs::write("test.msi", result)?;
-    //             fs::write(format!("{}.cell", cell_name), cell)?;
-    //             Ok(())
-    //         })?;
-    //     Ok(())
-    // }
+    use crate::{
+        assemble::AdsorptionBuilder,
+        lattice::LatticeModel,
+        model_type::{cell::CellModel, msi::MsiModel},
+    };
+
+    #[test]
+    fn test_adsorption_builder() {
+        let test_lat = read_to_string("SAC_GDY_Ag.msi").unwrap();
+        let lat = LatticeModel::<MsiModel>::try_from(test_lat.as_str()).unwrap();
+        let test_ad = read_to_string("COOH.msi").unwrap();
+        let ads = LatticeModel::<MsiModel>::try_from(test_ad.as_str()).unwrap();
+        let carbon_chain_vector = lat.get_vector_ab(41_u32, 42_u32).unwrap();
+        let builder = AdsorptionBuilder::new(lat);
+        let built_lattice = builder
+            .add_adsorbate(ads)
+            .set_height(1.4)
+            .set_coord_angle(0.0)
+            .set_location(&[41])
+            .set_ads_direction(&carbon_chain_vector)
+            .set_adsorbate_plane_angle(0.0)
+            .align_ads(&[2, 3])
+            .init_ads_plane_direction(&[1, 2, 3])
+            .place_adsorbate(&[2, 3], &[1], 1.4)
+            .build_adsorbed_lattice();
+        println!("{:?}", built_lattice);
+        let built_cell: LatticeModel<CellModel> = LatticeModel::<CellModel>::from(built_lattice);
+        write("Test_ag_cooh.cell", built_cell.cell_export()).unwrap();
+    }
 }

@@ -15,14 +15,17 @@ pub struct MsiModel {
 }
 
 impl MsiModel {
+    /// Returns the periodic type of this [`MsiModel`].
     pub fn periodic_type(&self) -> u8 {
         self.periodic_type
     }
 
+    /// Returns a reference to the space group of this [`MsiModel`].
     pub fn space_group(&self) -> &str {
         self.space_group.as_ref()
     }
 
+    /// Returns the cry tolerance of this [`MsiModel`].
     pub fn cry_tolerance(&self) -> f64 {
         self.cry_tolerance
     }
