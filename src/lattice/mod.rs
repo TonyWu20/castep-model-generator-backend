@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, ops::Add};
 
 use na::{Matrix3, Vector3};
 
@@ -169,5 +169,34 @@ where
         self.atoms_mut()
             .iter_mut()
             .for_each(|atom| atom.translate(translate_matrix));
+    }
+}
+
+/// Implementation of `Add` for merging `LatticeModel<T>`
+/// Both `self` and `rhs` will be consumed.
+impl<T> Add for LatticeModel<T>
+where
+    T: ModelInfo + Clone,
+{
+    type Output = LatticeModel<T>;
+
+    fn add(mut self, rhs: Self) -> Self::Output {
+        let last_number_id = self.atoms().len() as u32;
+        let mut rhs = rhs;
+        rhs.atoms_mut().iter_mut().for_each(|atom| {
+            atom.set_atom_id(atom.atom_id() + last_number_id);
+            self.atoms_mut().push(atom.to_owned());
+        });
+        let new_atoms = self.atoms().to_vec();
+        let Self {
+            lattice_vectors,
+            atoms: _,
+            model_type,
+        } = self;
+        Self {
+            lattice_vectors,
+            atoms: new_atoms,
+            model_type,
+        }
     }
 }

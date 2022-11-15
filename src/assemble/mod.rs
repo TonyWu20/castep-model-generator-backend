@@ -1,5 +1,5 @@
 /// Assemble adsorbate and lattice.
-use std::{collections::HashMap, error::Error};
+use std::{collections::HashMap, error::Error, f64::consts::PI};
 
 use na::{Point3, Translation3, Unit, UnitQuaternion, Vector3};
 
@@ -8,27 +8,41 @@ use crate::{
     model_type::ModelInfo, Transformation,
 };
 
-pub trait AdsorptionState {}
+pub trait BuilderState {}
+pub trait ParamSetState {}
 
 #[derive(Default, Debug)]
-pub struct Imported {}
+pub struct BareLattice;
 
 #[derive(Default, Debug)]
-pub struct Aligned {}
+pub struct Imported;
 
 #[derive(Default, Debug)]
-pub struct PlaneAdjusted {}
+pub struct ParamSet;
 
 #[derive(Default, Debug)]
-pub struct Ready {}
+pub struct Aligned;
 
-impl AdsorptionState for Imported {}
-impl AdsorptionState for Aligned {}
-impl AdsorptionState for PlaneAdjusted {}
-impl AdsorptionState for Ready {}
+#[derive(Default, Debug)]
+pub struct PlaneAdjusted;
+
+#[derive(Default, Debug)]
+pub struct Ready;
+
+impl BuilderState for BareLattice {}
+impl BuilderState for Imported {}
+impl BuilderState for ParamSet {}
+impl BuilderState for Aligned {}
+impl BuilderState for PlaneAdjusted {}
+impl BuilderState for Ready {}
+
+impl ParamSetState for ParamSet {}
+impl ParamSetState for Aligned {}
+impl ParamSetState for PlaneAdjusted {}
+impl ParamSetState for Ready {}
 
 #[derive(Debug)]
-pub struct AdsorptionBuilder<T: ModelInfo + Clone, U: AdsorptionState> {
+pub struct AdsorptionBuilder<T: ModelInfo + Clone, U: BuilderState> {
     host_lattice: LatticeModel<T>,
     adsorbate: Option<LatticeModel<T>>,
     location: Option<Point3<f64>>,
@@ -39,7 +53,32 @@ pub struct AdsorptionBuilder<T: ModelInfo + Clone, U: AdsorptionState> {
     state: U,
 }
 
-impl<T: ModelInfo + Clone> AdsorptionBuilder<T, Imported> {
+impl<T, U> AdsorptionBuilder<T, U>
+where
+    T: ModelInfo + Clone,
+    U: BuilderState + ParamSetState,
+{
+    fn adsorbate_plane_angle(&self) -> f64 {
+        self.adsorbate_plane_angle.unwrap()
+    }
+    fn adsorbate(&self) -> &LatticeModel<T> {
+        self.adsorbate.as_ref().unwrap()
+    }
+    fn location(&self) -> Point3<f64> {
+        self.location.unwrap()
+    }
+    fn adsorbate_mut(&mut self) -> &mut LatticeModel<T> {
+        self.adsorbate.as_mut().unwrap()
+    }
+    fn ads_direction(&self) -> &Vector3<f64> {
+        self.ads_direction.as_ref().unwrap()
+    }
+}
+
+impl<T> AdsorptionBuilder<T, BareLattice>
+where
+    T: ModelInfo + Clone,
+{
     pub fn new(host_lattice: LatticeModel<T>) -> Self {
         Self {
             host_lattice,
@@ -49,13 +88,37 @@ impl<T: ModelInfo + Clone> AdsorptionBuilder<T, Imported> {
             adsorbate_plane_angle: None,
             height: None,
             ads_direction: None,
-            state: Imported {},
+            state: BareLattice,
         }
     }
-    pub fn add_adsorbate(mut self, adsorbate_lattice: LatticeModel<T>) -> Self {
-        self.adsorbate = Some(adsorbate_lattice);
-        self
+    pub fn add_adsorbate(
+        self,
+        adsorbate_lattice: LatticeModel<T>,
+    ) -> AdsorptionBuilder<T, Imported> {
+        let Self {
+            host_lattice,
+            adsorbate: _,
+            location,
+            ads_direction,
+            coord_angle,
+            adsorbate_plane_angle,
+            height,
+            state: _,
+        } = self;
+        AdsorptionBuilder {
+            host_lattice,
+            adsorbate: Some(adsorbate_lattice),
+            location,
+            ads_direction,
+            coord_angle,
+            adsorbate_plane_angle,
+            height,
+            state: Imported,
+        }
     }
+}
+
+impl<T: ModelInfo + Clone> AdsorptionBuilder<T, Imported> {
     pub fn set_location(mut self, target_coord_sites: &[u32]) -> Self {
         let coord_points: Vec<&Point3<f64>> = target_coord_sites
             .iter()
@@ -89,27 +152,69 @@ impl<T: ModelInfo + Clone> AdsorptionBuilder<T, Imported> {
         self.adsorbate_plane_angle = Some(plane_angle);
         self
     }
+    pub fn set_done(self) -> AdsorptionBuilder<T, ParamSet> {
+        let Self {
+            host_lattice,
+            adsorbate,
+            location,
+            ads_direction,
+            coord_angle,
+            adsorbate_plane_angle,
+            height,
+            state: _,
+        } = self;
+        assert!(adsorbate.is_some());
+        assert!(location.is_some());
+        assert!(ads_direction.is_some());
+        assert!(coord_angle.is_some());
+        assert!(adsorbate_plane_angle.is_some());
+        assert!(height.is_some());
+        AdsorptionBuilder {
+            host_lattice,
+            adsorbate,
+            location,
+            ads_direction,
+            coord_angle,
+            adsorbate_plane_angle,
+            height,
+            state: ParamSet,
+        }
+    }
+}
+
+impl<T> AdsorptionBuilder<T, ParamSet>
+where
+    T: ModelInfo + Clone,
+{
     pub fn align_ads(mut self, stem_atom_ids: &[u32]) -> AdsorptionBuilder<T, Aligned> {
         let stem_vector = self
-            .adsorbate
-            .as_ref()
-            .unwrap()
+            .adsorbate()
             .get_vector_ab(stem_atom_ids[0], stem_atom_ids[1])
             .unwrap();
-        let direction_vec = self.ads_direction.unwrap();
-        let angle_stem_direction = stem_vector.angle(&direction_vec);
-        let rot_axis = Unit::new_normalize(stem_vector.cross(&direction_vec));
+        let direction_vec = self.ads_direction();
+        let angle_stem_direction = stem_vector.angle(direction_vec);
+        let rot_axis = Unit::new_normalize(stem_vector.cross(direction_vec));
         let rot_quatd = UnitQuaternion::from_axis_angle(&rot_axis, angle_stem_direction);
-        self.adsorbate.as_mut().unwrap().rotate(&rot_quatd);
+        self.adsorbate_mut().rotate(&rot_quatd);
+        let Self {
+            host_lattice,
+            adsorbate,
+            location,
+            ads_direction,
+            coord_angle,
+            adsorbate_plane_angle,
+            height,
+            state: _,
+        } = self;
         AdsorptionBuilder {
-            host_lattice: self.host_lattice,
-            adsorbate: self.adsorbate,
-            location: self.location,
-            ads_direction: self.ads_direction,
-            coord_angle: self.coord_angle,
-            adsorbate_plane_angle: self.adsorbate_plane_angle,
-            height: self.height,
-            state: Aligned {},
+            host_lattice,
+            adsorbate,
+            location,
+            ads_direction,
+            coord_angle,
+            adsorbate_plane_angle,
+            height,
+            state: Aligned,
         }
     }
 }
@@ -122,8 +227,9 @@ impl<T: ModelInfo + Clone> AdsorptionBuilder<T, Aligned> {
         mut self,
         plane_atom_ids: &[u32],
     ) -> AdsorptionBuilder<T, PlaneAdjusted> {
-        let target_plane_angle = self.adsorbate_plane_angle.unwrap();
-        let ads = self.adsorbate.as_ref().unwrap();
+        // Convert to radian
+        let target_plane_angle = self.adsorbate_plane_angle() * PI / 180.0;
+        let ads = self.adsorbate();
         let plane_ba = ads
             .get_vector_ab(plane_atom_ids[0], plane_atom_ids[1])
             .unwrap();
@@ -131,23 +237,35 @@ impl<T: ModelInfo + Clone> AdsorptionBuilder<T, Aligned> {
             .get_vector_ab(plane_atom_ids[0], plane_atom_ids[2])
             .unwrap();
         let plane_normal = plane_ba.cross(&plane_ca);
+        dbg!(plane_normal);
         let z_axis = Vector3::z_axis();
         // Let the rotate direction is from normal to z_axis.
         let rot_axis = Unit::new_normalize(plane_normal.cross(&z_axis));
+        // * The `angle` outputs in radian unit *
         let normal_to_z_angle = plane_normal.angle(&z_axis);
         // The angle needed to rotate is the difference between current plane normal to z-axis angle and the desired angle.
         let rot_angle = normal_to_z_angle - target_plane_angle;
         let rot_quatd = UnitQuaternion::from_axis_angle(&rot_axis, rot_angle);
-        self.adsorbate.as_mut().unwrap().rotate(&rot_quatd);
+        self.adsorbate_mut().rotate(&rot_quatd);
+        let Self {
+            host_lattice,
+            adsorbate,
+            location,
+            ads_direction,
+            coord_angle,
+            adsorbate_plane_angle,
+            height,
+            state: _,
+        } = self;
         AdsorptionBuilder {
-            host_lattice: self.host_lattice,
-            adsorbate: self.adsorbate,
-            location: self.location,
-            ads_direction: self.ads_direction,
-            coord_angle: self.coord_angle,
-            adsorbate_plane_angle: self.adsorbate_plane_angle,
-            height: self.height,
-            state: PlaneAdjusted {},
+            host_lattice,
+            adsorbate,
+            location,
+            ads_direction,
+            coord_angle,
+            adsorbate_plane_angle,
+            height,
+            state: PlaneAdjusted,
         }
     }
 }
@@ -159,46 +277,55 @@ impl<T: ModelInfo + Clone> AdsorptionBuilder<T, PlaneAdjusted> {
     input bond distance, while the bond direction follows the adsorbate direction.
     */
     fn single_coord(&mut self, stem_atom_ids: &[u32], coord_atom_id: u32, bond_distance: f64) {
-        let ads = self.adsorbate.as_ref().unwrap();
-        let location = self.location.unwrap();
+        let ads = self.adsorbate();
+        let location = self.location();
         let coord_atom_point = ads.get_atom_by_id(coord_atom_id).unwrap().xyz();
-        // Create a stem_vector pointing upwards
-        let stem_vector = {
-            let stem_atom_1 = ads.get_atom_by_id(stem_atom_ids[0]).unwrap();
-            let stem_atom_2 = ads.get_atom_by_id(stem_atom_ids[1]).unwrap();
-            if stem_atom_2.xyz().z > stem_atom_1.xyz().z {
-                stem_atom_2.xyz() - stem_atom_1.xyz()
-            } else {
-                stem_atom_1.xyz() - stem_atom_2.xyz()
-            }
-        };
-        /*
-        The stem pointing out from the target location. This is to find the
-        direction of the vector from coordination atom to target site.
-        */
-        let stem_from_loc = Vector3::new(
-            location.x + stem_vector.x,
-            location.y + stem_vector.y,
-            location.z + stem_vector.z,
-        );
-        // Scaled the above vector to the bonding distance
-        let scaled_stem_from_loc = stem_from_loc * (bond_distance / stem_from_loc.norm());
-        // Compute the actual position for the coordination atom to reach.
-        let actual_position = Point3::new(
-            location.x + scaled_stem_from_loc.x,
-            location.y + scaled_stem_from_loc.y,
-            location.z + scaled_stem_from_loc.z,
-        );
-        let translate_mat = Translation3::from(actual_position - coord_atom_point);
-        self.adsorbate.as_mut().unwrap().translate(&translate_mat);
+        // When the coord atom is on the stem
+        if stem_atom_ids.contains(&coord_atom_id) {
+            // Create a stem_vector pointing upwards
+            let stem_vector = {
+                let stem_atom_1 = ads.get_atom_by_id(stem_atom_ids[0]).unwrap();
+                let stem_atom_2 = ads.get_atom_by_id(stem_atom_ids[1]).unwrap();
+                if stem_atom_2.xyz().z > stem_atom_1.xyz().z {
+                    stem_atom_2.xyz() - stem_atom_1.xyz()
+                } else {
+                    stem_atom_1.xyz() - stem_atom_2.xyz()
+                }
+            };
+            /*
+            The stem pointing out from the target location. This is to find the
+            direction of the vector from coordination atom to target site.
+            */
+            let stem_from_loc = Vector3::new(
+                location.x + stem_vector.x,
+                location.y + stem_vector.y,
+                location.z + stem_vector.z,
+            );
+            // Scaled the above vector to the bonding distance
+            let scaled_stem_from_loc = stem_from_loc * (bond_distance / stem_from_loc.norm());
+            // Compute the actual position for the coordination atom to reach.
+            let actual_position = Point3::new(
+                location.x + scaled_stem_from_loc.x,
+                location.y + scaled_stem_from_loc.y,
+                location.z + scaled_stem_from_loc.z,
+            );
+            let translate_mat = Translation3::from(actual_position - coord_atom_point);
+            self.adsorbate_mut().translate(&translate_mat);
+        }
+        // Else, the coord atom is not on the stem, place it directly above the location with the `bond_distance`
+        else {
+            let actual_position = Point3::new(location.x, location.y, location.z + bond_distance);
+            let translate_mat = Translation3::from(actual_position - coord_atom_point);
+            self.adsorbate_mut().translate(&translate_mat);
+        }
     }
     /**
     When the adsorbate has multiple coordination atoms, translate
     the adsorbate from centroid of coord atoms to the location (centroid of target sites)
     */
     fn multiple_coord(&mut self, coord_atom_ids: &[u32], bond_distance: f64) {
-        let ads = self.adsorbate.as_ref().unwrap();
-        let mut location = self.location.unwrap();
+        let ads = self.adsorbate();
+        let mut location = self.location();
         if coord_atom_ids.len() > 1 {
             let coord_atom_points: Vec<&Point3<f64>> = coord_atom_ids
                 .iter()
@@ -207,7 +334,7 @@ impl<T: ModelInfo + Clone> AdsorptionBuilder<T, PlaneAdjusted> {
             let coord_centroid = centroid_of_points(&coord_atom_points);
             location.z += bond_distance;
             let translate_mat = Translation3::from(location - coord_centroid);
-            self.adsorbate.as_mut().unwrap().translate(&translate_mat);
+            self.adsorbate_mut().translate(&translate_mat);
         }
     }
     /// Place the adsorbate, depending on the number of coordination atoms.
@@ -244,27 +371,8 @@ impl<T> AdsorptionBuilder<T, Ready>
 where
     T: ModelInfo + Clone,
 {
-    pub fn build_adsorbed_lattice(mut self) -> LatticeModel<T> {
-        let last_atom_id = self.host_lattice.atoms().len() as u32;
-        self.adsorbate
-            .as_mut()
-            .unwrap()
-            .atoms_mut()
-            .into_iter()
-            .for_each(|atom| {
-                atom.set_atom_id(atom.atom_id() + last_atom_id);
-            });
-        let ads_atoms = self.adsorbate.as_ref().unwrap().atoms().to_vec();
-        for atom in ads_atoms.into_iter() {
-            self.host_lattice.atoms_mut().push(atom)
-        }
-        let all_atoms = self.host_lattice.atoms().to_vec();
-        let lattice_vectors = self.host_lattice.lattice_vectors().unwrap().clone();
-        LatticeModel::new(
-            Some(lattice_vectors),
-            all_atoms,
-            self.host_lattice.model_type().to_owned(),
-        )
+    pub fn build_adsorbed_lattice(self) -> LatticeModel<T> {
+        self.host_lattice + self.adsorbate.unwrap()
     }
 }
 /// For lattice that can add adsorbate. The adsorbate must implement `AdsorbateTraits` and `Clone`
