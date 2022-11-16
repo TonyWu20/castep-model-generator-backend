@@ -3,7 +3,7 @@ mod test {
     use std::fs::{read_to_string, write};
 
     use crate::{
-        assemble::AdsorptionBuilder,
+        assemble::{AdsParamsBuilder, AdsorptionBuilder, No},
         lattice::LatticeModel,
         model_type::{cell::CellModel, msi::MsiModel},
     };
@@ -18,12 +18,15 @@ mod test {
         let builder = AdsorptionBuilder::new(lat);
         let built_lattice = builder
             .add_adsorbate(ads)
-            .set_height(1.4)
-            .set_coord_angle(0.0)
-            .set_location(&[41])
-            .set_ads_direction(&carbon_chain_vector)
-            .set_adsorbate_plane_angle(90.0)
-            .set_done()
+            .with_location_at_sites(&[41])
+            .with_ads_params(
+                AdsParamsBuilder::<No, No, No, No>::new()
+                    .with_ads_direction(&carbon_chain_vector)
+                    .with_coord_angle(0.0)
+                    .with_plane_angle(90.0)
+                    .with_bond_length(1.4)
+                    .finish(),
+            )
             .align_ads(&[2, 3])
             .init_ads_plane_direction(&[1, 2, 3])
             .place_adsorbate(&[2, 3], &[1], 1.4)

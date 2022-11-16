@@ -6,9 +6,9 @@ pub mod atom;
 pub mod error;
 pub mod external_info;
 pub mod lattice;
-pub mod model_type;
-// pub mod param_writer;
 pub mod math_helper;
+pub mod model_type;
+pub mod param_writer;
 pub mod parser;
 pub mod test;
 
