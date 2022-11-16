@@ -1,5 +1,5 @@
 /// Assemble adsorbate and lattice.
-use std::{collections::HashMap, error::Error, f64::consts::PI};
+use std::{collections::HashMap, error::Error, f64::consts::PI, fmt::Debug, marker::PhantomData};
 
 use na::{Point3, Translation3, Unit, UnitQuaternion, Vector3};
 
@@ -10,6 +10,21 @@ use crate::{
 
 pub trait BuilderState {}
 pub trait ParamSetState {}
+
+#[derive(Default, Debug)]
+pub struct Yes;
+#[derive(Default, Debug)]
+pub struct No;
+
+pub trait ToAssign: Debug {}
+pub trait Assigned: ToAssign {}
+pub trait NotAssigned: ToAssign {}
+
+impl ToAssign for Yes {}
+impl ToAssign for No {}
+
+impl Assigned for Yes {}
+impl NotAssigned for No {}
 
 #[derive(Default, Debug)]
 pub struct BareLattice;
@@ -46,11 +61,158 @@ pub struct AdsorptionBuilder<T: ModelInfo + Clone, U: BuilderState> {
     host_lattice: LatticeModel<T>,
     adsorbate: Option<LatticeModel<T>>,
     location: Option<Point3<f64>>,
+    ads_params: Option<AdsParamsBuilder<Yes, Yes, Yes, Yes>>,
+    state: PhantomData<U>,
+}
+
+#[derive(Debug, Default)]
+pub struct AdsParamsBuilder<AdsDirSet, CdAngleSet, PlaneAngleSet, BondLengthSet>
+where
+    AdsDirSet: ToAssign,
+    CdAngleSet: ToAssign,
+    PlaneAngleSet: ToAssign,
+    BondLengthSet: ToAssign,
+{
     ads_direction: Option<Vector3<f64>>,
     coord_angle: Option<f64>,
     adsorbate_plane_angle: Option<f64>,
-    height: Option<f64>,
-    state: U,
+    bond_length: Option<f64>,
+    ads_direction_set: PhantomData<AdsDirSet>,
+    coord_angle_set: PhantomData<CdAngleSet>,
+    adsorbate_plane_angle_set: PhantomData<PlaneAngleSet>,
+    bond_length_set: PhantomData<BondLengthSet>,
+}
+
+impl<AdsDirSet, CdAngleSet, PlaneAngleSet, BondLengthSet>
+    AdsParamsBuilder<AdsDirSet, CdAngleSet, PlaneAngleSet, BondLengthSet>
+where
+    AdsDirSet: ToAssign,
+    CdAngleSet: ToAssign,
+    PlaneAngleSet: ToAssign,
+    BondLengthSet: ToAssign,
+{
+    pub fn new() -> AdsParamsBuilder<No, No, No, No> {
+        AdsParamsBuilder {
+            ads_direction: None,
+            coord_angle: None,
+            adsorbate_plane_angle: None,
+            bond_length: None,
+            ads_direction_set: PhantomData,
+            coord_angle_set: PhantomData,
+            adsorbate_plane_angle_set: PhantomData,
+            bond_length_set: PhantomData,
+        }
+    }
+    pub fn with_ads_direction(
+        mut self,
+        ads_direction: &Vector3<f64>,
+    ) -> AdsParamsBuilder<Yes, CdAngleSet, PlaneAngleSet, BondLengthSet> {
+        self.ads_direction = Some(ads_direction.to_owned());
+        let Self {
+            ads_direction,
+            coord_angle,
+            adsorbate_plane_angle,
+            bond_length,
+            ads_direction_set: _,
+            coord_angle_set,
+            adsorbate_plane_angle_set,
+            bond_length_set,
+        } = self;
+        AdsParamsBuilder {
+            ads_direction,
+            coord_angle,
+            adsorbate_plane_angle,
+            bond_length,
+            ads_direction_set: PhantomData,
+            coord_angle_set,
+            adsorbate_plane_angle_set,
+            bond_length_set,
+        }
+    }
+    pub fn with_coord_angle(
+        mut self,
+        coord_angle: f64,
+    ) -> AdsParamsBuilder<AdsDirSet, Yes, PlaneAngleSet, BondLengthSet> {
+        self.coord_angle = Some(coord_angle);
+        let Self {
+            ads_direction,
+            coord_angle,
+            adsorbate_plane_angle,
+            bond_length,
+            ads_direction_set,
+            coord_angle_set: _,
+            adsorbate_plane_angle_set,
+            bond_length_set,
+        } = self;
+        AdsParamsBuilder {
+            ads_direction,
+            coord_angle,
+            adsorbate_plane_angle,
+            bond_length,
+            ads_direction_set,
+            coord_angle_set: PhantomData,
+            adsorbate_plane_angle_set,
+            bond_length_set,
+        }
+    }
+    pub fn with_plane_angle(
+        mut self,
+        plane_angle: f64,
+    ) -> AdsParamsBuilder<AdsDirSet, CdAngleSet, Yes, BondLengthSet> {
+        self.adsorbate_plane_angle = Some(plane_angle);
+        let Self {
+            ads_direction,
+            coord_angle,
+            adsorbate_plane_angle,
+            bond_length,
+            ads_direction_set,
+            coord_angle_set,
+            adsorbate_plane_angle_set: _,
+            bond_length_set,
+        } = self;
+        AdsParamsBuilder {
+            ads_direction,
+            coord_angle,
+            adsorbate_plane_angle,
+            bond_length,
+            ads_direction_set,
+            coord_angle_set,
+            adsorbate_plane_angle_set: PhantomData,
+            bond_length_set,
+        }
+    }
+    pub fn with_bond_length(
+        mut self,
+        bond_length: f64,
+    ) -> AdsParamsBuilder<AdsDirSet, CdAngleSet, PlaneAngleSet, Yes> {
+        self.bond_length = Some(bond_length);
+        let Self {
+            ads_direction,
+            coord_angle,
+            adsorbate_plane_angle,
+            bond_length,
+            ads_direction_set,
+            coord_angle_set,
+            adsorbate_plane_angle_set,
+            bond_length_set: _,
+        } = self;
+        AdsParamsBuilder {
+            ads_direction,
+            coord_angle,
+            adsorbate_plane_angle,
+            bond_length,
+            ads_direction_set,
+            coord_angle_set,
+            adsorbate_plane_angle_set,
+            bond_length_set: PhantomData,
+        }
+    }
+}
+
+impl AdsParamsBuilder<Yes, Yes, Yes, Yes> {
+    pub fn finish(self) -> Self {
+        self
+    }
 }
 
 impl<T, U> AdsorptionBuilder<T, U>
@@ -58,8 +220,11 @@ where
     T: ModelInfo + Clone,
     U: BuilderState + ParamSetState,
 {
+    fn ads_params(&self) -> &AdsParamsBuilder<Yes, Yes, Yes, Yes> {
+        self.ads_params.as_ref().unwrap()
+    }
     fn adsorbate_plane_angle(&self) -> f64 {
-        self.adsorbate_plane_angle.unwrap()
+        self.ads_params().adsorbate_plane_angle.unwrap()
     }
     fn adsorbate(&self) -> &LatticeModel<T> {
         self.adsorbate.as_ref().unwrap()
@@ -71,7 +236,7 @@ where
         self.adsorbate.as_mut().unwrap()
     }
     fn ads_direction(&self) -> &Vector3<f64> {
-        self.ads_direction.as_ref().unwrap()
+        self.ads_params().ads_direction.as_ref().unwrap()
     }
 }
 
@@ -84,11 +249,8 @@ where
             host_lattice,
             adsorbate: None,
             location: None,
-            coord_angle: None,
-            adsorbate_plane_angle: None,
-            height: None,
-            ads_direction: None,
-            state: BareLattice,
+            ads_params: None,
+            state: PhantomData,
         }
     }
     pub fn add_adsorbate(
@@ -99,85 +261,47 @@ where
             host_lattice,
             adsorbate: _,
             location,
-            ads_direction,
-            coord_angle,
-            adsorbate_plane_angle,
-            height,
+            ads_params,
             state: _,
         } = self;
         AdsorptionBuilder {
             host_lattice,
             adsorbate: Some(adsorbate_lattice),
             location,
-            ads_direction,
-            coord_angle,
-            adsorbate_plane_angle,
-            height,
-            state: Imported,
+            ads_params,
+            state: PhantomData,
         }
     }
 }
 
 impl<T: ModelInfo + Clone> AdsorptionBuilder<T, Imported> {
-    pub fn set_location(mut self, target_coord_sites: &[u32]) -> Self {
-        let coord_points: Vec<&Point3<f64>> = target_coord_sites
+    pub fn with_location_at_sites(mut self, target_sites: &[u32]) -> Self {
+        let target_sites_points: Vec<&Point3<f64>> = target_sites
             .iter()
             .map(|&site_id| self.host_lattice.get_atom_by_id(site_id).unwrap().xyz())
             .collect();
-        let centroid = centroid_of_points(&coord_points);
+        let centroid = centroid_of_points(&target_sites_points);
         self.location = Some(centroid);
         self
     }
-    pub fn set_ads_direction(mut self, direction_vec: &Vector3<f64>) -> Self {
-        self.ads_direction = Some(direction_vec.to_owned());
-        self
-    }
-    /**
-    Determines the angle between the adsorbate and target sites.
-    If the adsorbate is singly-coordinated, this determines the angle of the adsorbate stem to the target site atom.
-    If the adsorbate has more than one coordinated atom, the angle should be 0.0 to set to be parallel.
-    */
-    pub fn set_coord_angle(mut self, angle: f64) -> Self {
-        self.coord_angle = Some(angle);
-        self
-    }
-    pub fn set_height(mut self, height: f64) -> Self {
-        self.height = Some(height);
-        self
-    }
-    /// Determines the adsorbate plane angel relative to the host target sites.
-    /// Example: When set to 0.0, it means the adsorbate is placed "flat". When set to 90.0, it means
-    /// it means the adsorbate plane is perpendicular to the host.
-    pub fn set_adsorbate_plane_angle(mut self, plane_angle: f64) -> Self {
-        self.adsorbate_plane_angle = Some(plane_angle);
-        self
-    }
-    pub fn set_done(self) -> AdsorptionBuilder<T, ParamSet> {
+    pub fn with_ads_params(
+        mut self,
+        ads_params: AdsParamsBuilder<Yes, Yes, Yes, Yes>,
+    ) -> AdsorptionBuilder<T, ParamSet> {
+        self.ads_params = Some(ads_params);
         let Self {
             host_lattice,
             adsorbate,
             location,
-            ads_direction,
-            coord_angle,
-            adsorbate_plane_angle,
-            height,
+            ads_params,
             state: _,
         } = self;
-        assert!(adsorbate.is_some());
-        assert!(location.is_some());
-        assert!(ads_direction.is_some());
-        assert!(coord_angle.is_some());
-        assert!(adsorbate_plane_angle.is_some());
-        assert!(height.is_some());
         AdsorptionBuilder {
             host_lattice,
             adsorbate,
             location,
-            ads_direction,
-            coord_angle,
-            adsorbate_plane_angle,
-            height,
-            state: ParamSet,
+            ads_params,
+            state: PhantomData,
         }
     }
 }
@@ -200,21 +324,15 @@ where
             host_lattice,
             adsorbate,
             location,
-            ads_direction,
-            coord_angle,
-            adsorbate_plane_angle,
-            height,
+            ads_params,
             state: _,
         } = self;
         AdsorptionBuilder {
             host_lattice,
             adsorbate,
             location,
-            ads_direction,
-            coord_angle,
-            adsorbate_plane_angle,
-            height,
-            state: Aligned,
+            ads_params,
+            state: PhantomData,
         }
     }
 }
@@ -251,21 +369,15 @@ impl<T: ModelInfo + Clone> AdsorptionBuilder<T, Aligned> {
             host_lattice,
             adsorbate,
             location,
-            ads_direction,
-            coord_angle,
-            adsorbate_plane_angle,
-            height,
+            ads_params,
             state: _,
         } = self;
         AdsorptionBuilder {
             host_lattice,
             adsorbate,
             location,
-            ads_direction,
-            coord_angle,
-            adsorbate_plane_angle,
-            height,
-            state: PlaneAdjusted,
+            ads_params,
+            state: PhantomData,
         }
     }
 }
@@ -358,11 +470,8 @@ impl<T: ModelInfo + Clone> AdsorptionBuilder<T, PlaneAdjusted> {
             host_lattice: self.host_lattice,
             adsorbate: self.adsorbate,
             location: self.location,
-            ads_direction: self.ads_direction,
-            coord_angle: self.coord_angle,
-            adsorbate_plane_angle: self.adsorbate_plane_angle,
-            height: self.height,
-            state: Ready {},
+            ads_params: self.ads_params,
+            state: PhantomData,
         }
     }
 }
