@@ -1,4 +1,8 @@
-use std::fmt::Display;
+use std::{
+    fmt::Display,
+    fs::File,
+    io::{BufRead, BufReader},
+};
 
 use crate::{
     atom::Atom,
@@ -240,6 +244,48 @@ impl LatticeModel<CellModel> {
             self.species_lcao_str(),
         ];
         cell_text.concat()
+    }
+    pub fn get_final_cutoff_energy(&self, potentials_loc: &str) -> f64 {
+        let mut energy: f64 = 0.0;
+        self.list_element().iter().for_each(|elm| {
+            let potential_file = ELEMENT_TABLE.get_by_symbol(elm).unwrap().potential();
+            let potential_path = format!("{potentials_loc}/{potential_file}");
+            let file = File::open(&potential_path).unwrap();
+            let file = BufReader::new(file);
+            let fine_energy: u32 = file
+                .lines()
+                .find(|line| line.as_ref().unwrap().contains("FINE"))
+                .map(|line| {
+                    let num_str = line.as_ref().unwrap().split_whitespace().next().unwrap();
+                    num_str.parse::<u32>().unwrap()
+                })
+                .unwrap();
+            let round_bigger_tenth = |num: u32| -> f64 {
+                match num % 10 {
+                    0 => num as f64,
+                    _ => ((num / 10 + 1) * 10) as f64,
+                }
+            };
+            let ultra_fine_energy = round_bigger_tenth((fine_energy as f64 * 1.1) as u32);
+            energy = if energy > ultra_fine_energy {
+                energy
+            } else {
+                ultra_fine_energy
+            };
+        });
+        energy
+    }
+    pub fn spin_total(&self) -> u8 {
+        self.atoms()
+            .iter()
+            .map(|atom| -> u8 {
+                ELEMENT_TABLE
+                    .get_by_symbol(atom.element_symbol())
+                    .unwrap()
+                    .spin
+            })
+            .reduce(|total, next| total + next)
+            .unwrap()
     }
 }
 
