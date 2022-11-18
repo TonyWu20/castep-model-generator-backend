@@ -344,7 +344,6 @@ impl<T: ModelInfo + Clone> AdsorptionBuilder<T, Aligned> {
             .get_vector_ab(plane_atom_ids[0], plane_atom_ids[2])
             .unwrap();
         let plane_normal = plane_ba.cross(&plane_ca);
-        dbg!(plane_normal);
         let z_axis = Vector3::z_axis();
         // Let the rotate direction is from normal to z_axis.
         let rot_axis = Unit::new_normalize(plane_normal.cross(&z_axis));
