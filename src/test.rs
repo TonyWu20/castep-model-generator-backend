@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test {
-    use std::fs::{read_to_string, write};
+    use std::fs::read_to_string;
 
     use crate::{
         assemble::{AdsParamsBuilder, AdsorptionBuilder},
