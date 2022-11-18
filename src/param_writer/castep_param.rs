@@ -67,6 +67,16 @@ impl<T: Task> CastepParam<T> {
     }
 }
 
+impl From<CastepParam<GeomOptParam>> for CastepParam<BandStructureParam> {
+    fn from(geom_param: CastepParam<GeomOptParam>) -> Self {
+        CastepParam {
+            spin: geom_param.spin,
+            cut_off_energy: geom_param.cut_off_energy,
+            ..Default::default()
+        }
+    }
+}
+
 /// Parameters in `Geometry Optimization` only.
 pub struct GeomOptParam {
     geom_energy_tol: f64,
