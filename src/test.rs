@@ -3,13 +3,15 @@ mod test {
     use std::fs::{read_to_string, write};
 
     use crate::{
-        assemble::{AdsParamsBuilder, AdsorptionBuilder, No},
+        assemble::{AdsParamsBuilder, AdsorptionBuilder},
+        builder_typestate::No,
         lattice::LatticeModel,
         model_type::{cell::CellModel, msi::MsiModel},
+        param_writer::{castep_param::GeomOptParam, seed_writer::SeedWriter},
     };
 
     #[test]
-    fn test_adsorption_builder() {
+    fn test_builder() {
         let test_lat = read_to_string("SAC_GDY_Ag.msi").unwrap();
         let lat = LatticeModel::<MsiModel>::try_from(test_lat.as_str()).unwrap();
         let test_ad = read_to_string("COOH.msi").unwrap();
@@ -32,7 +34,15 @@ mod test {
             .place_adsorbate(&[2, 3], &[1], 1.4)
             .build_adsorbed_lattice();
         println!("{:?}", built_lattice);
-        let built_cell: LatticeModel<CellModel> = LatticeModel::<CellModel>::from(built_lattice);
+        let built_cell: LatticeModel<CellModel> = built_lattice.into();
+        let export_loc_str = "test";
+        let potential_loc_str = "../C-GDY-SAC/Potentials";
+        let geom_seed_writer: SeedWriter<GeomOptParam> = SeedWriter::build(&built_cell)
+            .with_seed_name("Test_ag_cooh")
+            .with_export_loc(export_loc_str)
+            .with_potential_loc(potential_loc_str)
+            .build();
+        geom_seed_writer.write_seed_files().unwrap();
         write("Test_ag_cooh.cell", built_cell.cell_export()).unwrap();
     }
 }

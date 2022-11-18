@@ -4,27 +4,16 @@ use std::{collections::HashMap, error::Error, f64::consts::PI, fmt::Debug, marke
 use na::{Point3, Translation3, Unit, UnitQuaternion, Vector3};
 
 use crate::{
-    adsorbate::Adsorbate, lattice::LatticeModel, math_helper::centroid_of_points,
-    model_type::ModelInfo, Transformation,
+    adsorbate::Adsorbate,
+    builder_typestate::{No, ToAssign, Yes},
+    lattice::LatticeModel,
+    math_helper::centroid_of_points,
+    model_type::ModelInfo,
+    Transformation,
 };
 
 pub trait BuilderState {}
 pub trait ParamSetState {}
-
-#[derive(Default, Debug)]
-pub struct Yes;
-#[derive(Default, Debug)]
-pub struct No;
-
-pub trait ToAssign: Debug {}
-pub trait Assigned: ToAssign {}
-pub trait NotAssigned: ToAssign {}
-
-impl ToAssign for Yes {}
-impl ToAssign for No {}
-
-impl Assigned for Yes {}
-impl NotAssigned for No {}
 
 #[derive(Default, Debug)]
 pub struct BareLattice;

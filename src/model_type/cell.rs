@@ -7,6 +7,7 @@ use std::{
 use crate::{
     atom::Atom,
     lattice::{LatticeModel, LatticeVectors},
+    param_writer::ms_aux_files::{KptAux, TrjAux},
     Transformation,
 };
 
@@ -20,6 +21,9 @@ use super::{msi::MsiModel, ModelInfo};
 pub struct CellModel {
     /// List of k-points. Each k-point has xyz and a weight factor.
     kpoints_list: Vec<[f64; 4]>,
+    kpoints_grid: [u8; 3],
+    kpoints_mp_spacing: Option<f64>,
+    kpoints_mp_offset: [f64; 3],
     /// Option in `IONIC_CONSTRAINTS`
     fix_all_cell: bool,
     /// Option in `IONIC_CONSTRAINTS`
@@ -36,6 +40,9 @@ impl Default for CellModel {
     fn default() -> Self {
         Self {
             kpoints_list: vec![[0.0, 0.0, 0.0, 1.0]],
+            kpoints_grid: [1, 1, 1],
+            kpoints_mp_spacing: None,
+            kpoints_mp_offset: [0.0, 0.0, 0.0],
             fix_all_cell: true,
             fix_com: false,
             external_efield: [0.0, 0.0, 0.0],
@@ -286,6 +293,20 @@ impl LatticeModel<CellModel> {
             })
             .reduce(|total, next| total + next)
             .unwrap()
+    }
+    /// Build `KptAux` struct
+    pub fn build_kptaux(&self) -> KptAux {
+        KptAux::new(
+            self.model_type().kpoints_list.clone(),
+            self.model_type().kpoints_grid,
+            self.model_type().kpoints_mp_spacing,
+            self.model_type().kpoints_mp_offset,
+        )
+    }
+    /// Build `TrjAux` struct
+    pub fn build_trjaux(&self) -> TrjAux {
+        let atom_ids: Vec<u32> = self.atoms().iter().map(|atom| atom.atom_id()).collect();
+        TrjAux::new(atom_ids)
     }
 }
 

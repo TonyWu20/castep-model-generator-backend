@@ -3,6 +3,7 @@
 pub mod adsorbate;
 pub mod assemble;
 pub mod atom;
+pub mod builder_typestate;
 pub mod error;
 pub mod external_info;
 pub mod lattice;
