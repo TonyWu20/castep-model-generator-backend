@@ -7,7 +7,10 @@ mod test {
         builder_typestate::No,
         lattice::LatticeModel,
         model_type::{cell::CellModel, msi::MsiModel},
-        param_writer::{castep_param::GeomOptParam, seed_writer::SeedWriter},
+        param_writer::{
+            castep_param::{BandStructureParam, GeomOptParam},
+            seed_writer::SeedWriter,
+        },
     };
 
     #[test]
@@ -33,7 +36,6 @@ mod test {
             .init_ads_plane_direction(&[1, 2, 3])
             .place_adsorbate(&[2, 3], &[1], 1.4)
             .build_adsorbed_lattice();
-        println!("{:?}", built_lattice);
         let built_cell: LatticeModel<CellModel> = built_lattice.into();
         let export_loc_str = "test";
         let potential_loc_str = "../C-GDY-SAC/Potentials";
@@ -43,6 +45,8 @@ mod test {
             .with_potential_loc(potential_loc_str)
             .build();
         geom_seed_writer.write_seed_files().unwrap();
-        write("Test_ag_cooh.cell", built_cell.cell_export()).unwrap();
+        geom_seed_writer.copy_potentials().unwrap();
+        let bs_writer: SeedWriter<BandStructureParam> = geom_seed_writer.into();
+        bs_writer.write_seed_files().unwrap();
     }
 }
