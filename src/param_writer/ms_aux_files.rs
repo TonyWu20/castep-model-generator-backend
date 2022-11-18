@@ -11,6 +11,7 @@ use rayon::prelude::*;
 
 use super::MyFilePath;
 #[derive(Debug)]
+/// Writer of `Materials Studio` required auxilliary files when running `Castep` tasks.
 pub struct MsAuxWriter<P: MyFilePath> {
     filestem: String,
     export_loc: P,
@@ -21,28 +22,38 @@ pub struct MsAuxWriter<P: MyFilePath> {
 }
 
 impl<P: MyFilePath> MsAuxWriter<P> {
+    /// Call the builder
     pub fn build<'a>(filestem: &str, export_loc: &'a P) -> ParamWriterBuilder<'a, P> {
         ParamWriterBuilder::new(filestem, export_loc)
     }
+    /// Private method for handling path creation.
     fn path_builder(&self, extension: &str) -> Result<PathBuf, io::Error> {
         let dir_name = format!("{}_{}", self.filestem, self.task);
         let dir_loc: OsString = self.export_loc.clone().into();
         let export_loc = PathBuf::from(dir_loc).join(&dir_name);
         create_dir_all(&export_loc)?;
-        let filename = format!("{}.{}", self.filestem, extension);
+        let filename = format!("{}{}", self.filestem, extension);
         Ok(export_loc.join(filename))
     }
+    /// Write `.kptaux` file for `Geometry Optimization` tasks.
     pub fn write_kptaux(&self) -> Result<(), io::Error> {
-        let kptaux_path = self.path_builder("kptaux")?;
+        let kptaux_path = self.path_builder(".kptaux")?;
         fs::write(kptaux_path, self.kptaux.export())
     }
+    /// Write `.kptaux` file for `Band Structure` tasks.
+    pub fn write_bs_kptaux(&self) -> Result<(), io::Error> {
+        let kptaux_path = self.path_builder("_DOS.kptaux")?;
+        fs::write(kptaux_path, self.kptaux.export())
+    }
+    /// Write `.trjaux` file for trajection of atoms in the cell.
     pub fn write_trjaux(&self) -> Result<(), io::Error> {
-        let trjaux_path = self.path_builder("trjaux")?;
+        let trjaux_path = self.path_builder(".trjaux")?;
         fs::write(trjaux_path, self.trjaux.export())
     }
 }
 
 #[derive(Debug)]
+/// Builder for `ParamWriter<P>`
 pub struct ParamWriterBuilder<'a, P: MyFilePath> {
     filestem: String,
     export_loc: &'a P,
@@ -62,6 +73,7 @@ impl<'a, P: MyFilePath> ParamWriterBuilder<'a, P> {
             task: Some("opt".to_string()),
         }
     }
+    /// Set potentials_loc
     pub fn with_potentials_loc(self, potentials_loc: &'a P) -> Self {
         Self {
             filestem: self.filestem,
@@ -72,6 +84,7 @@ impl<'a, P: MyFilePath> ParamWriterBuilder<'a, P> {
             task: self.task,
         }
     }
+    /// Provide the `KptAux` struct
     pub fn with_kptaux(self, kptaux: KptAux) -> Self {
         Self {
             filestem: self.filestem,
@@ -82,6 +95,7 @@ impl<'a, P: MyFilePath> ParamWriterBuilder<'a, P> {
             task: self.task,
         }
     }
+    /// Provide the `TrjAux` struct
     pub fn with_trjaux(self, trjaux: TrjAux) -> Self {
         Self {
             filestem: self.filestem,
@@ -92,6 +106,7 @@ impl<'a, P: MyFilePath> ParamWriterBuilder<'a, P> {
             task: self.task,
         }
     }
+    /// Set task
     pub fn set_task(self, task: &str) -> Self {
         Self {
             filestem: self.filestem,
@@ -102,6 +117,7 @@ impl<'a, P: MyFilePath> ParamWriterBuilder<'a, P> {
             task: Some(task.into()),
         }
     }
+    /// Build `MsAuxWriter` from given fields.
     pub fn build(self) -> MsAuxWriter<P> {
         MsAuxWriter {
             filestem: self.filestem,
@@ -119,12 +135,12 @@ pub struct KptAux {
     kpoints: Vec<[f64; 4]>,
     /// This specifies the dimensions of the Monkhorst-Pack grid requested in the directions of the reciprocal space lattice vectors.
     mp_grid: [u8; 3],
-    /**
-    The single entry is the maximum distance between k-points on the Monkhorst-Pack grid. The dimensions of the grid will be chosen such that the maximum separation of k-points is less than this.
-    Default unit is Å^-1
-    */
+    /// The single entry is the maximum distance between k-points on the Monkhorst-Pack grid.
+    /// The dimensions of the grid will be chosen such that the maximum separation of k-points is less than this.
+    /// Default unit is Å^-1
     mp_spacing: Option<f64>,
-    /// This specifies the offset of the Monkhorst-Pack grid with respect to the origin of the Brillouin zone. The three entries are the offset in fractional coordinates relative to the reciprocal lattice vectors.
+    /// This specifies the offset of the Monkhorst-Pack grid with respect to the origin of the Brillouin zone.
+    /// The three entries are the offset in fractional coordinates relative to the reciprocal lattice vectors.
     mp_offset: [f64; 3],
 }
 
@@ -196,6 +212,9 @@ impl TrjAux {
         }
     }
 }
+
+/// Scan the generated `msi` files, create a perl script to be run in `Materials Studio`
+/// to save as `xsd` format.
 pub fn to_xsd_scripts(target_root_dir: &str) -> Result<(), Box<dyn Error>> {
     let msi_pattern = format!("{target_root_dir}/**/*.msi");
     let item_collection = glob(&msi_pattern)
