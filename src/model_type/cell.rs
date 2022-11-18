@@ -1,7 +1,7 @@
 use std::{
     fmt::Display,
     fs::File,
-    io::{BufRead, BufReader},
+    io::{self, BufRead, BufReader},
 };
 
 use crate::{
@@ -136,6 +136,19 @@ impl LatticeModel<CellModel> {
             .collect();
         CellModel::write_block(("KPOINTS_LIST".to_string(), kpoints_list.concat()))
     }
+    /// For output in `.cell` for `BandStructure` calculation.
+    fn bs_kpoints_list_str(&self) -> String {
+        let kpoints_list: Vec<String> = self
+            .model_type()
+            .kpoints_list
+            .iter()
+            .map(|kpoint| {
+                let [x, y, z, weight] = kpoint;
+                format!("{:20.16}{:20.16}{:20.16}{:20.16}\n", x, y, z, weight)
+            })
+            .collect();
+        CellModel::write_block(("BS_KPOINTS_LIST".to_string(), kpoints_list.concat()))
+    }
     /// No constraints. Future: adapt to settings
     fn ionic_constraints(&self) -> String {
         CellModel::write_block(("IONIC_CONSTRAINTS".to_string(), "".to_string()))
@@ -239,6 +252,7 @@ impl LatticeModel<CellModel> {
             .collect();
         CellModel::write_block(("SPECIES_LCAO_STATES".to_string(), lcao_strings.concat()))
     }
+    /// Export to ".cell" for geometry optimization task.
     pub fn cell_export(&self) -> String {
         let lattice_vector_string = format!("{}", self.lattice_vectors().unwrap());
         let cell_text = vec![
@@ -252,35 +266,56 @@ impl LatticeModel<CellModel> {
         ];
         cell_text.concat()
     }
-    pub fn get_final_cutoff_energy(&self, potentials_loc: &str) -> f64 {
+    /// Export to "_DOS.cell" for band structure calculation task.
+    pub fn bs_cell_export(&self) -> String {
+        let lattice_vector_string = format!("{}", self.lattice_vectors().unwrap());
+        let cell_text = vec![
+            lattice_vector_string,
+            self.positions_str(),
+            self.bs_kpoints_list_str(),
+            self.kpoints_list_str(),
+            self.misc_options(),
+            self.species_mass(),
+            self.species_pot_str(),
+            self.species_lcao_str(),
+        ];
+        cell_text.concat()
+    }
+    pub fn get_final_cutoff_energy(&self, potentials_loc: &str) -> Result<f64, io::Error> {
         let mut energy: f64 = 0.0;
-        self.list_element().iter().for_each(|elm| {
-            let potential_file = ELEMENT_TABLE.get_by_symbol(elm).unwrap().potential();
-            let potential_path = format!("{potentials_loc}/{potential_file}");
-            let file = File::open(&potential_path).unwrap();
-            let file = BufReader::new(file);
-            let fine_energy: u32 = file
-                .lines()
-                .find(|line| line.as_ref().unwrap().contains("FINE"))
-                .map(|line| {
-                    let num_str = line.as_ref().unwrap().split_whitespace().next().unwrap();
-                    num_str.parse::<u32>().unwrap()
-                })
-                .unwrap();
-            let round_bigger_tenth = |num: u32| -> f64 {
-                match num % 10 {
-                    0 => num as f64,
-                    _ => ((num / 10 + 1) * 10) as f64,
+        self.list_element()
+            .iter()
+            .try_for_each(|elm| -> Result<(), io::Error> {
+                let potential_file = ELEMENT_TABLE.get_by_symbol(elm).unwrap().potential();
+                let potential_path = format!("{potentials_loc}/{potential_file}");
+                if let Ok(file) = File::open(&potential_path) {
+                    let file = BufReader::new(file);
+                    let fine_energy: u32 = file
+                        .lines()
+                        .find(|line| line.as_ref().unwrap().contains("FINE"))
+                        .map(|line| {
+                            let num_str = line.as_ref().unwrap().split_whitespace().next().unwrap();
+                            num_str.parse::<u32>().unwrap()
+                        })
+                        .unwrap();
+                    let round_bigger_tenth = |num: u32| -> f64 {
+                        match num % 10 {
+                            0 => num as f64,
+                            _ => ((num / 10 + 1) * 10) as f64,
+                        }
+                    };
+                    let ultra_fine_energy = round_bigger_tenth((fine_energy as f64 * 1.1) as u32);
+                    energy = if energy > ultra_fine_energy {
+                        energy
+                    } else {
+                        ultra_fine_energy
+                    };
+                    Ok(())
+                } else {
+                    panic!("Error while reading potential file for element: {}", elm)
                 }
-            };
-            let ultra_fine_energy = round_bigger_tenth((fine_energy as f64 * 1.1) as u32);
-            energy = if energy > ultra_fine_energy {
-                energy
-            } else {
-                ultra_fine_energy
-            };
-        });
-        energy
+            })?;
+        Ok(energy)
     }
     pub fn spin_total(&self) -> u8 {
         self.atoms()
