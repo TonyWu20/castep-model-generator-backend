@@ -50,44 +50,38 @@ pub struct AdsorptionBuilder<T: ModelInfo + Clone, U: BuilderState> {
     host_lattice: LatticeModel<T>,
     adsorbate: Option<LatticeModel<T>>,
     location: Option<Point3<f64>>,
-    ads_params: Option<AdsParamsBuilder<Yes, Yes, Yes, Yes>>,
+    ads_params: Option<AdsParamsBuilder<Yes, Yes, Yes>>,
     state: PhantomData<U>,
 }
 
 #[derive(Debug, Default)]
-pub struct AdsParamsBuilder<AdsDirSet, CdAngleSet, PlaneAngleSet, BondLengthSet>
+pub struct AdsParamsBuilder<AdsDirSet, PlaneAngleSet, BondLengthSet>
 where
     AdsDirSet: ToAssign,
-    CdAngleSet: ToAssign,
     PlaneAngleSet: ToAssign,
     BondLengthSet: ToAssign,
 {
     ads_direction: Option<Vector3<f64>>,
-    coord_angle: Option<f64>,
     adsorbate_plane_angle: Option<f64>,
     bond_length: Option<f64>,
     ads_direction_set: PhantomData<AdsDirSet>,
-    coord_angle_set: PhantomData<CdAngleSet>,
     adsorbate_plane_angle_set: PhantomData<PlaneAngleSet>,
     bond_length_set: PhantomData<BondLengthSet>,
 }
 
-impl<AdsDirSet, CdAngleSet, PlaneAngleSet, BondLengthSet>
-    AdsParamsBuilder<AdsDirSet, CdAngleSet, PlaneAngleSet, BondLengthSet>
+impl<AdsDirSet, PlaneAngleSet, BondLengthSet>
+    AdsParamsBuilder<AdsDirSet, PlaneAngleSet, BondLengthSet>
 where
     AdsDirSet: ToAssign,
-    CdAngleSet: ToAssign,
     PlaneAngleSet: ToAssign,
     BondLengthSet: ToAssign,
 {
-    pub fn new() -> AdsParamsBuilder<No, No, No, No> {
+    pub fn new() -> AdsParamsBuilder<No, No, No> {
         AdsParamsBuilder {
             ads_direction: None,
-            coord_angle: None,
             adsorbate_plane_angle: None,
             bond_length: None,
             ads_direction_set: PhantomData,
-            coord_angle_set: PhantomData,
             adsorbate_plane_angle_set: PhantomData,
             bond_length_set: PhantomData,
         }
@@ -95,77 +89,69 @@ where
     pub fn with_ads_direction(
         mut self,
         ads_direction: &Vector3<f64>,
-    ) -> AdsParamsBuilder<Yes, CdAngleSet, PlaneAngleSet, BondLengthSet> {
+    ) -> AdsParamsBuilder<Yes, PlaneAngleSet, BondLengthSet> {
         self.ads_direction = Some(ads_direction.to_owned());
         let Self {
             ads_direction,
-            coord_angle,
             adsorbate_plane_angle,
             bond_length,
             ads_direction_set: _,
-            coord_angle_set,
             adsorbate_plane_angle_set,
             bond_length_set,
         } = self;
         AdsParamsBuilder {
             ads_direction,
-            coord_angle,
             adsorbate_plane_angle,
             bond_length,
             ads_direction_set: PhantomData,
-            coord_angle_set,
             adsorbate_plane_angle_set,
             bond_length_set,
         }
     }
-    pub fn with_coord_angle(
-        mut self,
-        coord_angle: f64,
-    ) -> AdsParamsBuilder<AdsDirSet, Yes, PlaneAngleSet, BondLengthSet> {
-        self.coord_angle = Some(coord_angle);
-        let Self {
-            ads_direction,
-            coord_angle,
-            adsorbate_plane_angle,
-            bond_length,
-            ads_direction_set,
-            coord_angle_set: _,
-            adsorbate_plane_angle_set,
-            bond_length_set,
-        } = self;
-        AdsParamsBuilder {
-            ads_direction,
-            coord_angle,
-            adsorbate_plane_angle,
-            bond_length,
-            ads_direction_set,
-            coord_angle_set: PhantomData,
-            adsorbate_plane_angle_set,
-            bond_length_set,
-        }
-    }
+    // pub fn with_coord_angle(
+    //     mut self,
+    //     coord_angle: f64,
+    // ) -> AdsParamsBuilder<AdsDirSet, Yes, PlaneAngleSet, BondLengthSet> {
+    //     self.coord_angle = Some(coord_angle);
+    //     let Self {
+    //         ads_direction,
+    //         coord_angle,
+    //         adsorbate_plane_angle,
+    //         bond_length,
+    //         ads_direction_set,
+    //         coord_angle_set: _,
+    //         adsorbate_plane_angle_set,
+    //         bond_length_set,
+    //     } = self;
+    //     AdsParamsBuilder {
+    //         ads_direction,
+    //         coord_angle,
+    //         adsorbate_plane_angle,
+    //         bond_length,
+    //         ads_direction_set,
+    //         coord_angle_set: PhantomData,
+    //         adsorbate_plane_angle_set,
+    //         bond_length_set,
+    //     }
+    // }
     pub fn with_plane_angle(
         mut self,
         plane_angle: f64,
-    ) -> AdsParamsBuilder<AdsDirSet, CdAngleSet, Yes, BondLengthSet> {
+    ) -> AdsParamsBuilder<AdsDirSet, Yes, BondLengthSet> {
         self.adsorbate_plane_angle = Some(plane_angle);
         let Self {
             ads_direction,
-            coord_angle,
             adsorbate_plane_angle,
             bond_length,
             ads_direction_set,
-            coord_angle_set,
             adsorbate_plane_angle_set: _,
             bond_length_set,
         } = self;
         AdsParamsBuilder {
             ads_direction,
-            coord_angle,
             adsorbate_plane_angle,
             bond_length,
             ads_direction_set,
-            coord_angle_set,
             adsorbate_plane_angle_set: PhantomData,
             bond_length_set,
         }
@@ -173,32 +159,28 @@ where
     pub fn with_bond_length(
         mut self,
         bond_length: f64,
-    ) -> AdsParamsBuilder<AdsDirSet, CdAngleSet, PlaneAngleSet, Yes> {
+    ) -> AdsParamsBuilder<AdsDirSet, PlaneAngleSet, Yes> {
         self.bond_length = Some(bond_length);
         let Self {
             ads_direction,
-            coord_angle,
             adsorbate_plane_angle,
             bond_length,
             ads_direction_set,
-            coord_angle_set,
             adsorbate_plane_angle_set,
             bond_length_set: _,
         } = self;
         AdsParamsBuilder {
             ads_direction,
-            coord_angle,
             adsorbate_plane_angle,
             bond_length,
             ads_direction_set,
-            coord_angle_set,
             adsorbate_plane_angle_set,
             bond_length_set: PhantomData,
         }
     }
 }
 
-impl AdsParamsBuilder<Yes, Yes, Yes, Yes> {
+impl AdsParamsBuilder<Yes, Yes, Yes> {
     pub fn finish(self) -> Self {
         self
     }
@@ -209,7 +191,7 @@ where
     T: ModelInfo + Clone,
     U: BuilderState + ParamSetState,
 {
-    fn ads_params(&self) -> &AdsParamsBuilder<Yes, Yes, Yes, Yes> {
+    fn ads_params(&self) -> &AdsParamsBuilder<Yes, Yes, Yes> {
         self.ads_params.as_ref().unwrap()
     }
     fn adsorbate_plane_angle(&self) -> f64 {
@@ -275,7 +257,7 @@ impl<T: ModelInfo + Clone> AdsorptionBuilder<T, Imported> {
     }
     pub fn with_ads_params(
         mut self,
-        ads_params: AdsParamsBuilder<Yes, Yes, Yes, Yes>,
+        ads_params: AdsParamsBuilder<Yes, Yes, Yes>,
     ) -> AdsorptionBuilder<T, ParamSet> {
         self.ads_params = Some(ads_params);
         let Self {
@@ -299,6 +281,7 @@ impl<T> AdsorptionBuilder<T, ParamSet>
 where
     T: ModelInfo + Clone,
 {
+    /// Align the adsorbate stem with the given direction on host
     pub fn align_ads(mut self, stem_atom_ids: &[u32]) -> AdsorptionBuilder<T, Aligned> {
         let stem_vector = self
             .adsorbate()
