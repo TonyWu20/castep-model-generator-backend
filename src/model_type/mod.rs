@@ -1,4 +1,4 @@
 pub mod cell;
 pub mod msi;
 
-pub trait ModelInfo {}
+pub trait ModelInfo: Clone {}

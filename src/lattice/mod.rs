@@ -5,7 +5,7 @@ use na::{Matrix3, Vector3};
 use crate::{atom::Atom, error::InvalidIndex, model_type::ModelInfo, Transformation};
 
 #[derive(Debug, Clone)]
-pub struct LatticeModel<T: ModelInfo + Clone> {
+pub struct LatticeModel<T: ModelInfo> {
     lattice_vectors: Option<LatticeVectors<T>>,
     atoms: Vec<Atom<T>>,
     model_type: T,
@@ -13,7 +13,7 @@ pub struct LatticeModel<T: ModelInfo + Clone> {
 
 impl<T> LatticeModel<T>
 where
-    T: ModelInfo + Clone,
+    T: ModelInfo,
 {
     pub fn new(
         lattice_vectors: Option<LatticeVectors<T>>,
@@ -154,7 +154,7 @@ where
 
 impl<T> Transformation for LatticeModel<T>
 where
-    T: ModelInfo + Clone,
+    T: ModelInfo,
 {
     fn rotate(&mut self, rotate_quatd: &na::UnitQuaternion<f64>) {
         self.atoms_mut()
@@ -176,7 +176,7 @@ where
 /// Both `self` and `rhs` will be consumed.
 impl<T> Add for LatticeModel<T>
 where
-    T: ModelInfo + Clone,
+    T: ModelInfo,
 {
     type Output = LatticeModel<T>;
 
