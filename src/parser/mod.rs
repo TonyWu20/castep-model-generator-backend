@@ -28,5 +28,15 @@ pub fn float(input: &str) -> IResult<&str, &str> {
             decimal,
         ))), // Case three: 42. and 42.42
         recognize(tuple((opt(one_of("+-")), decimal, char('.'), opt(decimal)))),
+        // Case four: -42.e-05
+        recognize(tuple((
+            opt(one_of("+-")),
+            decimal,
+            char('.'),
+            decimal,
+            one_of("eE"),
+            opt(one_of("+-")),
+            decimal,
+        ))),
     ))(input)
 }
