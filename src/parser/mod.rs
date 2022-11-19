@@ -27,16 +27,31 @@ pub fn float(input: &str) -> IResult<&str, &str> {
             opt(one_of("+-")),
             decimal,
         ))), // Case three: 42. and 42.42
-        recognize(tuple((opt(one_of("+-")), decimal, char('.'), opt(decimal)))),
-        // Case four: -42.e-05
+        // Case four: 42., +42., 42.42, and -42.e-05
         recognize(tuple((
             opt(one_of("+-")),
             decimal,
             char('.'),
-            decimal,
-            one_of("eE"),
+            opt(decimal),
+            opt(one_of("eE")),
             opt(one_of("+-")),
-            decimal,
+            opt(decimal),
         ))),
     ))(input)
+}
+
+#[test]
+fn test_float() {
+    let number = "-2.865153883599e-05";
+    let number_2 = "-2.";
+    let parse_float = float(number);
+    match parse_float {
+        Ok((_, num)) => println!("{num}"),
+        Err(e) => println!("{e}"),
+    }
+    let parse_float_2 = float(number_2);
+    match parse_float_2 {
+        Ok((_, num)) => println!("{num}"),
+        Err(e) => println!("{e}"),
+    }
 }
