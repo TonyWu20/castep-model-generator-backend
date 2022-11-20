@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test {
-    use std::fs::read_to_string;
+    use std::fs::{read_to_string, write};
 
     use crate::{
         assemble::{AdsParamsBuilder, AdsorptionBuilder},
@@ -13,6 +13,14 @@ mod test {
         },
     };
 
+    #[test]
+    fn test_conversion() {
+        let test_lat = read_to_string("SAC_GDY_Ag.msi").unwrap();
+        let msi_lat: LatticeModel<MsiModel> = LatticeModel::try_from(test_lat.as_str()).unwrap();
+        let cell_lat: LatticeModel<CellModel> = msi_lat.into();
+        let msi_back: LatticeModel<MsiModel> = cell_lat.into();
+        write("SAC_GDY_Ag_back.msi", msi_back.msi_export()).unwrap();
+    }
     #[test]
     fn test_builder() {
         let test_lat = read_to_string("SAC_GDY_Ag.msi").unwrap();
