@@ -82,6 +82,12 @@ where
     }
 }
 
+impl<T: ModelInfo> AsRef<LatticeModel<T>> for LatticeModel<T> {
+    fn as_ref(&self) -> &LatticeModel<T> {
+        self
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct LatticeVectors<T: ModelInfo> {
     vectors: Matrix3<f64>,
