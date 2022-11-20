@@ -63,22 +63,37 @@ impl CellModel {
 }
 
 /// Transition from `LatticeModel<MsiFormat>` to `LatticeModel<CellFormat>`
-impl From<LatticeModel<MsiModel>> for LatticeModel<CellModel> {
-    fn from(msi_model: LatticeModel<MsiModel>) -> Self {
+impl<T> From<T> for LatticeModel<CellModel>
+where
+    T: AsRef<LatticeModel<MsiModel>>,
+{
+    fn from(msi_model: T) -> Self {
         let x_axis: Vector3<f64> = Vector::x();
-        let a_vec = msi_model.lattice_vectors().unwrap().vectors().column(0);
+        let a_vec = msi_model
+            .as_ref()
+            .lattice_vectors()
+            .unwrap()
+            .vectors()
+            .column(0);
         let a_to_x_angle = a_vec.angle(&x_axis);
         let rot_axis = a_vec.cross(&x_axis).normalize();
         let rot_quatd: UnitQuaternion<f64> = UnitQuaternion::new(rot_axis * a_to_x_angle);
         let new_lat_vec = LatticeVectors::new(
-            msi_model.lattice_vectors().unwrap().vectors().to_owned(),
+            msi_model
+                .as_ref()
+                .lattice_vectors()
+                .unwrap()
+                .vectors()
+                .to_owned(),
             CellModel::default(),
         );
         let fractional_coord_matrix = msi_model
+            .as_ref()
             .lattice_vectors()
             .unwrap()
             .fractional_coord_matrix();
         let cell_atoms = msi_model
+            .as_ref()
             .atoms()
             .iter()
             .map(|atom| -> Atom<CellModel> {
