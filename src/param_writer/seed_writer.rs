@@ -11,7 +11,7 @@ use cpt::{data::ELEMENT_TABLE, element::LookupElement};
 use crate::{
     builder_typestate::{No, ToAssign, Yes},
     lattice::LatticeModel,
-    model_type::cell::CellModel,
+    model_type::{cell::CellModel, msi::MsiModel},
 };
 
 use super::{
@@ -115,6 +115,9 @@ impl<'a> SeedWriter<'a, GeomOptParam> {
         fs::write(param_path, format!("{}", self.param))?;
         let cell_path = self.path_builder(".cell")?;
         fs::write(cell_path, self.cell.cell_export())?;
+        let msi_path = self.path_builder(".msi")?;
+        let msi_model: LatticeModel<MsiModel> = self.cell.into();
+        fs::write(msi_path, msi_model.msi_export())?;
         Ok(())
     }
 }
