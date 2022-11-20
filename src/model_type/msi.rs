@@ -1,11 +1,14 @@
 use std::fmt::Display;
 
+use na::{UnitQuaternion, Vector, Vector3};
+
 use crate::{
     atom::Atom,
     lattice::{LatticeModel, LatticeVectors},
+    Transformation,
 };
 
-use super::ModelInfo;
+use super::{cell::CellModel, ModelInfo};
 
 #[derive(Debug, Clone)]
 pub struct MsiModel {
@@ -85,6 +88,44 @@ impl Display for LatticeVectors<MsiModel> {
             vector_c.x, vector_c.y, vector_c.z
         );
         writeln!(f, "{vector_a_line}{vector_b_line}{vector_c_line}")
+    }
+}
+
+impl From<LatticeModel<CellModel>> for LatticeModel<MsiModel> {
+    fn from(cell_model: LatticeModel<CellModel>) -> Self {
+        let y_axis: Vector3<f64> = Vector::y();
+        let b_vec = cell_model.lattice_vectors().unwrap().vectors().column(1);
+        let b_to_y_angle = b_vec.angle(&y_axis);
+        let rot_axis = b_vec.cross(&y_axis).normalize();
+        let rot_quatd: UnitQuaternion<f64> = UnitQuaternion::new(rot_axis * b_to_y_angle);
+        let new_lat_vec = LatticeVectors::new(
+            cell_model.lattice_vectors().unwrap().vectors().to_owned(),
+            MsiModel::default(),
+        );
+        // The inverse of the fractional coord matrix is the cartesian coord matrix
+        let frac_to_cart_matrix = cell_model
+            .lattice_vectors()
+            .unwrap()
+            .fractional_coord_matrix()
+            .try_inverse()
+            .unwrap();
+        let msi_atoms = cell_model
+            .atoms()
+            .iter()
+            .map(|atom| -> Atom<MsiModel> {
+                let cart_coord = frac_to_cart_matrix * atom.xyz();
+                Atom::new(
+                    atom.element_symbol().to_string(),
+                    atom.element_id(),
+                    cart_coord,
+                    atom.atom_id(),
+                    MsiModel::default(),
+                )
+            })
+            .collect();
+        let mut msi_model = Self::new(Some(new_lat_vec), msi_atoms, MsiModel::default());
+        msi_model.rotate(&rot_quatd);
+        msi_model
     }
 }
 

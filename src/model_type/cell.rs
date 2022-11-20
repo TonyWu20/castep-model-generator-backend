@@ -64,25 +64,24 @@ impl CellModel {
 
 /// Transition from `LatticeModel<MsiFormat>` to `LatticeModel<CellFormat>`
 impl From<LatticeModel<MsiModel>> for LatticeModel<CellModel> {
-    fn from(mut msi_model: LatticeModel<MsiModel>) -> Self {
+    fn from(msi_model: LatticeModel<MsiModel>) -> Self {
         let x_axis: Vector3<f64> = Vector::x();
         let a_vec = msi_model.lattice_vectors().unwrap().vectors().column(0);
         let a_to_x_angle = a_vec.angle(&x_axis);
         let rot_axis = a_vec.cross(&x_axis).normalize();
         let rot_quatd: UnitQuaternion<f64> = UnitQuaternion::new(rot_axis * a_to_x_angle);
-        msi_model.rotate(&rot_quatd);
         let new_lat_vec = LatticeVectors::new(
             msi_model.lattice_vectors().unwrap().vectors().to_owned(),
             CellModel::default(),
         );
-        let mut msi_atoms = msi_model.atoms().to_owned();
         let fractional_coord_matrix = msi_model
             .lattice_vectors()
             .unwrap()
             .fractional_coord_matrix();
-        let cell_atoms = msi_atoms
-            .iter_mut()
-            .map(|atom| {
+        let cell_atoms = msi_model
+            .atoms()
+            .iter()
+            .map(|atom| -> Atom<CellModel> {
                 let fractional_coord = fractional_coord_matrix * atom.xyz();
                 Atom::new(
                     atom.element_symbol().to_string(),
@@ -93,7 +92,9 @@ impl From<LatticeModel<MsiModel>> for LatticeModel<CellModel> {
                 )
             })
             .collect();
-        Self::new(Some(new_lat_vec), cell_atoms, CellModel::default())
+        let mut cell_model = Self::new(Some(new_lat_vec), cell_atoms, CellModel::default());
+        cell_model.rotate(&rot_quatd);
+        cell_model
     }
 }
 
