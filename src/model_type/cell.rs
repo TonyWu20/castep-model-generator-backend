@@ -65,9 +65,9 @@ impl CellModel {
 /// Transition from `LatticeModel<MsiFormat>` to `LatticeModel<CellFormat>`
 impl<T> From<T> for LatticeModel<CellModel>
 where
-    T: AsRef<LatticeModel<MsiModel>>,
+    T: AsRef<LatticeModel<MsiModel>> + AsMut<LatticeModel<MsiModel>>,
 {
-    fn from(msi_model: T) -> Self {
+    fn from(mut msi_model: T) -> Self {
         let x_axis: Vector3<f64> = Vector::x();
         let a_vec = msi_model
             .as_ref()
@@ -78,6 +78,7 @@ where
         let a_to_x_angle = a_vec.angle(&x_axis);
         let rot_axis = a_vec.cross(&x_axis).normalize();
         let rot_quatd: UnitQuaternion<f64> = UnitQuaternion::new(rot_axis * a_to_x_angle);
+        msi_model.as_mut().rotate(&rot_quatd);
         let new_lat_vec = LatticeVectors::new(
             msi_model
                 .as_ref()
@@ -107,9 +108,7 @@ where
                 )
             })
             .collect();
-        let mut cell_model = Self::new(Some(new_lat_vec), cell_atoms, CellModel::default());
-        cell_model.rotate(&rot_quatd);
-        cell_model
+        Self::new(Some(new_lat_vec), cell_atoms, CellModel::default())
     }
 }
 
