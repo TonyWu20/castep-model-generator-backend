@@ -523,45 +523,27 @@ impl<'a, T: ModelInfo> AdsorptionBuilder<'a, T, Calibrated> {
         let location = self.location();
         let coord_atom_id = self.coord_atom_ids()[0];
         let coord_atom_point = ads.get_atom_by_id(coord_atom_id).unwrap().xyz();
+        let vertical_proj_from_coord_atom = Vector3::new(0.0, 0.0, self.bond_length());
+        // Create a stem_vector guaranteed to be pointing upwards
+        let stem_vector = {
+            let stem_atom_1 = ads.get_atom_by_id(self.stem_atom_ids()[0]).unwrap();
+            let stem_atom_2 = ads.get_atom_by_id(self.stem_atom_ids()[1]).unwrap();
+            if stem_atom_2.xyz().z > stem_atom_1.xyz().z {
+                stem_atom_2.xyz() - stem_atom_1.xyz()
+            } else {
+                stem_atom_1.xyz() - stem_atom_2.xyz()
+            }
+        };
+        let actual_position = if stem_vector.dot(&vertical_proj_from_coord_atom) != 0.0 {
+            let unit_stem_vector = Unit::new_normalize(stem_vector);
+            let translate_mat = Translation3::from(unit_stem_vector.scale(self.bond_length()));
+            translate_mat.transform_point(&location)
+        } else {
+            Point3::new(location.x, location.y, location.z + self.bond_length())
+        };
         // When the coord atom is on the stem
-        if self.stem_atom_ids().contains(&coord_atom_id) {
-            // Create a stem_vector pointing upwards
-            let stem_vector = {
-                let stem_atom_1 = ads.get_atom_by_id(self.stem_atom_ids()[0]).unwrap();
-                let stem_atom_2 = ads.get_atom_by_id(self.stem_atom_ids()[1]).unwrap();
-                if stem_atom_2.xyz().z > stem_atom_1.xyz().z {
-                    stem_atom_2.xyz() - stem_atom_1.xyz()
-                } else {
-                    stem_atom_1.xyz() - stem_atom_2.xyz()
-                }
-            };
-            /*
-            The stem pointing out from the target location. This is to find the
-            direction of the vector from coordination atom to target site.
-            */
-            let stem_from_loc = Vector3::new(
-                location.x + stem_vector.x,
-                location.y + stem_vector.y,
-                location.z + stem_vector.z,
-            );
-            // Scaled the above vector to the bonding distance
-            let scaled_stem_from_loc = stem_from_loc * (self.bond_length() / stem_from_loc.norm());
-            // Compute the actual position for the coordination atom to reach.
-            let actual_position = Point3::new(
-                location.x + scaled_stem_from_loc.x,
-                location.y + scaled_stem_from_loc.y,
-                location.z + scaled_stem_from_loc.z,
-            );
-            let translate_mat = Translation3::from(actual_position - coord_atom_point);
-            self.adsorbate_mut().translate(&translate_mat);
-        }
-        // Else, the coord atom is not on the stem, place it directly above the location with the `bond_distance`
-        else {
-            let actual_position =
-                Point3::new(location.x, location.y, location.z + self.bond_length());
-            let translate_mat = Translation3::from(actual_position - coord_atom_point);
-            self.adsorbate_mut().translate(&translate_mat);
-        }
+        let translate_mat = Translation3::from(actual_position - coord_atom_point);
+        self.adsorbate_mut().translate(&translate_mat);
     }
     /**
     When the adsorbate has multiple coordination atoms, translate
