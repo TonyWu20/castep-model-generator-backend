@@ -534,13 +534,14 @@ impl<'a, T: ModelInfo> AdsorptionBuilder<'a, T, Calibrated> {
                 stem_atom_1.xyz() - stem_atom_2.xyz()
             }
         };
-        let actual_position = if stem_vector.dot(&vertical_proj_from_coord_atom) != 0.0 {
-            let unit_stem_vector = Unit::new_normalize(stem_vector);
-            let translate_mat = Translation3::from(unit_stem_vector.scale(self.bond_length()));
-            translate_mat.transform_point(&location)
-        } else {
-            Point3::new(location.x, location.y, location.z + self.bond_length())
-        };
+        let actual_position =
+            if stem_vector.dot(&vertical_proj_from_coord_atom) - 0.0 > f64::EPSILON {
+                let unit_stem_vector = Unit::new_normalize(stem_vector);
+                let translate_mat = Translation3::from(unit_stem_vector.scale(self.bond_length()));
+                translate_mat.transform_point(&location)
+            } else {
+                Point3::new(location.x, location.y, location.z + self.bond_length())
+            };
         // When the coord atom is on the stem
         let translate_mat = Translation3::from(actual_position - coord_atom_point);
         self.adsorbate_mut().translate(&translate_mat);
