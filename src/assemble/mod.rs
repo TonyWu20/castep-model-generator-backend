@@ -7,7 +7,7 @@ use crate::{
     adsorbate::Adsorbate,
     builder_typestate::{No, ToAssign, Yes},
     lattice::LatticeModel,
-    math_helper::centroid_of_points,
+    math_helper::{centroid_of_points, find_perp_vec3},
     model_type::ModelInfo,
     Transformation,
 };
@@ -326,7 +326,21 @@ impl<T: ModelInfo + Clone> AdsorptionBuilder<T, Aligned> {
         let plane_ca = ads
             .get_vector_ab(plane_atom_ids[0], plane_atom_ids[2])
             .unwrap();
-        let plane_normal = plane_ba.cross(&plane_ca);
+        let plane_normal = match plane_atom_ids[1] == plane_atom_ids[2] {
+            false => {
+                let plane_ba = ads
+                    .get_vector_ab(plane_atom_ids[0], plane_atom_ids[1])
+                    .unwrap();
+                let plane_ca = ads
+                    .get_vector_ab(plane_atom_ids[0], plane_atom_ids[2])
+                    .unwrap();
+                plane_ba.cross(&plane_ca)
+            }
+            true => {
+                let stem_vector = self.ads_direction();
+                find_perp_vec3(stem_vector)
+            }
+        };
         let z_axis = Vector3::z_axis();
         // Let the rotate direction is from normal to z_axis.
         let rot_axis = Unit::new_normalize(plane_normal.cross(&z_axis));
