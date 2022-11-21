@@ -484,6 +484,17 @@ where
         };
         let rotate_quatd = UnitQuaternion::from_euler_angles(roll_angle, pitch_angle, yaw_angle);
         self.adsorbate_mut().rotate(&rotate_quatd);
+        if self
+            .adsorbate()
+            .get_atom_by_id(self.coord_atom_ids()[0])
+            .unwrap()
+            .xyz()
+            .z
+            > 0.0
+        {
+            let rotate_quatd = UnitQuaternion::from_euler_angles(0.0, PI, 0.0);
+            self.adsorbate_mut().rotate(&rotate_quatd);
+        }
         let Self {
             host_lattice,
             adsorbate,
