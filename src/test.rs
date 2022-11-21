@@ -33,15 +33,18 @@ mod test {
             .add_adsorbate(ads)
             .with_location_at_sites(&[41])
             .with_ads_params(
-                AdsParamsBuilder::<No, No, No>::new()
+                AdsParamsBuilder::<No, No, No, No>::new()
                     .with_ads_direction(&carbon_chain_vector)
                     .with_plane_angle(90.0)
                     .with_bond_length(1.4)
+                    .with_stem_coord_angle(0.0)
+                    .with_coord_atom_ids(&[1])
+                    .with_stem_atom_ids(&[2, 3])
+                    .with_plane_atom_ids(&[1, 2, 3])
                     .finish(),
             )
-            .align_ads(&[2, 3])
-            .init_ads_plane_direction(&[1, 2, 3])
-            .place_adsorbate(&[2, 3], &[1], 1.4)
+            .init_ads()
+            .place_adsorbate()
             .build_adsorbed_lattice();
         let built_cell: LatticeModel<CellModel> = built_lattice.into();
         let export_loc_str = "test";
