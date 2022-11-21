@@ -320,12 +320,6 @@ impl<T: ModelInfo + Clone> AdsorptionBuilder<T, Aligned> {
         // Convert to radian
         let target_plane_angle = self.adsorbate_plane_angle() * PI / 180.0;
         let ads = self.adsorbate();
-        let plane_ba = ads
-            .get_vector_ab(plane_atom_ids[0], plane_atom_ids[1])
-            .unwrap();
-        let plane_ca = ads
-            .get_vector_ab(plane_atom_ids[0], plane_atom_ids[2])
-            .unwrap();
         let plane_normal = match plane_atom_ids[1] == plane_atom_ids[2] {
             false => {
                 let plane_ba = ads
@@ -338,7 +332,11 @@ impl<T: ModelInfo + Clone> AdsorptionBuilder<T, Aligned> {
             }
             true => {
                 let stem_vector = self.ads_direction();
-                find_perp_vec3(stem_vector)
+                let normal = find_perp_vec3(stem_vector);
+                let plane_atom_0_xyz = ads.get_atom_by_id(plane_atom_ids[0]).unwrap().xyz();
+                let (x, y, z) = (plane_atom_0_xyz.x, plane_atom_0_xyz.y, plane_atom_0_xyz.z);
+                // Let the plane normal starts from the plane_atom_0_xyz
+                normal + Vector3::new(x, y, z)
             }
         };
         let z_axis = Vector3::z_axis();
