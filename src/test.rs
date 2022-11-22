@@ -36,10 +36,11 @@ mod test {
         let lat = LatticeModel::<MsiModel>::try_from(test_lat.as_str()).unwrap();
         let test_ad = read_to_string(ads_name).unwrap();
         let ads = LatticeModel::<MsiModel>::try_from(test_ad.as_str()).unwrap();
-        let carbon_chain_vector = lat.get_vector_ab(42_u32, 41_u32).unwrap();
+        let carbon_chain_vector = lat.get_vector_ab(41_u32, 42_u32).unwrap();
         let export_loc_str = "test";
         let potential_loc_str = "../C-GDY-SAC/Potentials";
         let builder = AdsorptionBuilder::new(lat);
+        println!("Seed: {}", seed_name);
         let built_lattice = builder
             .add_adsorbate(ads)
             .with_location_at_sites(target_sites)
@@ -99,12 +100,34 @@ mod test {
             "COH.msi",
             &[41],
             90.0,
-            0.0,
+            90.0,
             &[1, 2],
             &[1],
             &[1, 2, 3],
             3,
             "Test_Ag_COH",
-        )
+        );
+        build(
+            "CH2.msi",
+            &[41],
+            90.0,
+            0.0,
+            &[2, 3],
+            &[1],
+            &[1, 2, 3],
+            2,
+            "Test_Ag_CH2",
+        );
+        build(
+            "COOH.msi",
+            &[41],
+            90.0,
+            0.0,
+            &[2, 3],
+            &[1],
+            &[1, 2, 3],
+            4,
+            "Test_Ag_COOH",
+        );
     }
 }
