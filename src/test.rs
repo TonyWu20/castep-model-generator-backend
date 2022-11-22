@@ -29,6 +29,7 @@ mod test {
         stem_atom_ids: &[u32],
         coord_atom_ids: &[u32],
         plane_atom_ids: &[u32],
+        upper_atom_id: u32,
         seed_name: &str,
     ) {
         let test_lat = read_to_string("SAC_GDY_Ag.msi").unwrap();
@@ -55,7 +56,7 @@ mod test {
                     .with_plane_atom_ids(plane_atom_ids) // CO
                     .finish(),
             )
-            .init_ads()
+            .init_ads(upper_atom_id)
             .place_adsorbate()
             .build_adsorbed_lattice();
         let built_cell: LatticeModel<CellModel> = built_lattice.into();
@@ -80,6 +81,7 @@ mod test {
             &[1, 2],
             &[1],
             &[1, 2, 3],
+            3,
             "Test_Ag_OCC",
         );
         build(
@@ -90,6 +92,7 @@ mod test {
             &[1, 2],
             &[1],
             &[1, 2, 2],
+            2,
             "Test_Ag_CO",
         );
         build(
@@ -100,6 +103,7 @@ mod test {
             &[1, 2],
             &[1],
             &[1, 2, 3],
+            3,
             "Test_Ag_COH",
         )
     }
