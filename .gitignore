@@ -14,3 +14,7 @@ Cargo.lock
 
 /target
 /Cargo.lock
+
+test
+*.msi
+*.cell
