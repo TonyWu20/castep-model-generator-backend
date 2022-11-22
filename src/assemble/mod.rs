@@ -6,7 +6,7 @@ use na::{Point3, Translation3, Unit, UnitQuaternion, Vector3};
 use crate::{
     builder_typestate::{No, ToAssign, Yes},
     lattice::LatticeModel,
-    math_helper::centroid_of_points,
+    math_helper::{centroid_of_points, find_perp_vec3},
     model_type::ModelInfo,
     Transformation,
 };
@@ -420,12 +420,8 @@ where
             .unwrap();
         // Align stem to point to positive x-axis
         let x_axis = Vector3::x(); // X-axis
-        let stem_x_angle = if stem_vector.x >= 0.0 {
-            // Stem points toward positive x-axis
-            x_axis.angle(&stem_vector)
-        } else {
-            x_axis.angle(&stem_vector) + PI // Stem points toward negative x-axis
-        };
+        let stem_x_angle = x_axis.angle(&stem_vector);
+        // Stem points toward positive x-axis
         let rotation_axis = Unit::new_normalize(stem_vector.cross(&x_axis));
         let rotate_quatd = UnitQuaternion::from_axis_angle(&rotation_axis, stem_x_angle);
         self.adsorbate_mut().rotate(&rotate_quatd);
@@ -452,12 +448,7 @@ where
         let yaw_angle = if ads_atom_nums == 1 {
             0.0
         } else {
-            let direction_xy_proj = self.ads_direction().xy();
-            if direction_xy_proj.x >= 0.0 {
-                stem_vector.xy().angle(&direction_xy_proj)
-            } else {
-                2.0 * PI - stem_vector.xy().angle(&direction_xy_proj)
-            }
+            stem_vector.xy().angle(&self.ads_direction().xy())
         };
         // Determine the roll angle. The purpose is to lay the specified plane around the stem to the proper angle.
         let roll_angle = match ads_atom_nums {
@@ -484,27 +475,28 @@ where
         };
         let rotate_quatd = UnitQuaternion::from_euler_angles(roll_angle, pitch_angle, yaw_angle);
         self.adsorbate_mut().rotate(&rotate_quatd);
+        let cd_atom_z = self
+            .adsorbate()
+            .get_atom_by_id(self.coord_atom_ids()[0])
+            .unwrap()
+            .xyz()
+            .z;
         if self
             .adsorbate()
             .get_atom_by_id(upper_atom_id)
             .unwrap()
             .xyz()
             .z
-            < 0.0
+            < cd_atom_z
         {
-            let curr_stem_centroid = na::center(
-                self.adsorbate()
-                    .get_atom_by_id(self.stem_atom_ids()[0])
-                    .unwrap()
-                    .xyz(),
-                self.adsorbate()
-                    .get_atom_by_id(self.stem_atom_ids()[1])
-                    .unwrap()
-                    .xyz(),
-            );
-            let translate_mat = Translation3::from(Point3::origin() - curr_stem_centroid);
-            self.adsorbate_mut().translate(&translate_mat);
-            let rotate_quatd = UnitQuaternion::from_euler_angles(0.0, PI, 0.0);
+            let curr_stem = self
+                .adsorbate()
+                .get_vector_ab(self.stem_atom_ids()[0], self.stem_atom_ids()[1])
+                .unwrap();
+            // The rotation axis should be perpendicular to the stem axis.
+            let rot_axis = Unit::new_normalize(find_perp_vec3(&curr_stem));
+            // Flip up by 180 degrees
+            let rotate_quatd = UnitQuaternion::from_axis_angle(&rot_axis, PI);
             self.adsorbate_mut().rotate(&rotate_quatd);
         }
         let Self {
@@ -546,14 +538,15 @@ impl<'a, T: ModelInfo> AdsorptionBuilder<'a, T, Calibrated> {
                 stem_atom_1.xyz() - stem_atom_2.xyz()
             }
         };
-        let actual_position =
-            if stem_vector.dot(&vertical_proj_from_coord_atom) - 0.0 > f64::EPSILON {
-                let unit_stem_vector = Unit::new_normalize(stem_vector);
-                let translate_mat = Translation3::from(unit_stem_vector.scale(self.bond_length()));
-                translate_mat.transform_point(&location)
-            } else {
-                Point3::new(location.x, location.y, location.z + self.bond_length())
-            };
+        let angle = stem_vector.angle(&vertical_proj_from_coord_atom);
+        let actual_position = if angle - PI / 2.0 > f64::EPSILON {
+            println!("Not vertical");
+            let unit_stem_vector = Unit::new_normalize(stem_vector);
+            let translate_mat = Translation3::from(unit_stem_vector.scale(self.bond_length()));
+            translate_mat.transform_point(&location)
+        } else {
+            Point3::new(location.x, location.y, location.z + self.bond_length())
+        };
         // When the coord atom is on the stem
         let translate_mat = Translation3::from(actual_position - coord_atom_point);
         self.adsorbate_mut().translate(&translate_mat);
