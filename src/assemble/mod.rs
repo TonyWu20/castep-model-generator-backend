@@ -413,7 +413,7 @@ impl<'a, T> AdsorptionBuilder<'a, T, ParamSet>
 where
     T: ModelInfo,
 {
-    pub fn init_ads(mut self) -> AdsorptionBuilder<'a, T, Calibrated> {
+    pub fn init_ads(mut self, upper_atom_id: u32) -> AdsorptionBuilder<'a, T, Calibrated> {
         let stem_vector = self
             .adsorbate()
             .get_vector_ab(self.stem_atom_ids()[0], self.stem_atom_ids()[1])
@@ -486,12 +486,24 @@ where
         self.adsorbate_mut().rotate(&rotate_quatd);
         if self
             .adsorbate()
-            .get_atom_by_id(self.coord_atom_ids()[0])
+            .get_atom_by_id(upper_atom_id)
             .unwrap()
             .xyz()
             .z
-            > 0.0
+            < 0.0
         {
+            let curr_stem_centroid = na::center(
+                self.adsorbate()
+                    .get_atom_by_id(self.stem_atom_ids()[0])
+                    .unwrap()
+                    .xyz(),
+                self.adsorbate()
+                    .get_atom_by_id(self.stem_atom_ids()[1])
+                    .unwrap()
+                    .xyz(),
+            );
+            let translate_mat = Translation3::from(Point3::origin() - curr_stem_centroid);
+            self.adsorbate_mut().translate(&translate_mat);
             let rotate_quatd = UnitQuaternion::from_euler_angles(0.0, PI, 0.0);
             self.adsorbate_mut().rotate(&rotate_quatd);
         }
