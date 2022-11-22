@@ -51,9 +51,13 @@ where
             .ok_or(InvalidIndex)
     }
     pub fn get_vector_ab(&self, a_id: u32, b_id: u32) -> Result<Vector3<f64>, InvalidIndex> {
-        let atom_a_xyz = self.get_atom_by_id(a_id)?.xyz();
-        let atom_b_xyz = self.get_atom_by_id(b_id)?.xyz();
-        Ok(atom_b_xyz - atom_a_xyz)
+        if a_id != b_id {
+            let atom_a_xyz = self.get_atom_by_id(a_id)?.xyz();
+            let atom_b_xyz = self.get_atom_by_id(b_id)?.xyz();
+            Ok(atom_b_xyz - atom_a_xyz)
+        } else {
+            Err(InvalidIndex)
+        }
     }
     pub fn list_element(&self) -> Vec<String> {
         let mut elm_list: Vec<(String, u32)> = vec![];
