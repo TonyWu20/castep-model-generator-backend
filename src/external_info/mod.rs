@@ -26,10 +26,6 @@ fn test_yaml() -> Result<(), Box<dyn Error>> {
     let ads_table = AdsTab::load_table(project_info.adsorbate_table_loc())?;
     assert!(ads_table.adsorbates().is_some());
     let hash_ads_tab = ads_table.hash_table()?;
-    assert_eq!(
-        vec![1, 2, 3],
-        hash_ads_tab.get("CH2CHOH").unwrap().plane_atom_ids()
-    );
     println!("{:?}", project_info);
     let coord_sites_dict = project_info.hash_coord_site();
     println!("{}", coord_sites_dict.get(&41).unwrap());
