@@ -6,7 +6,7 @@ use na::{Point3, Translation3, Unit, UnitQuaternion, Vector3};
 use crate::{
     builder_typestate::{No, ToAssign, Yes},
     lattice::LatticeModel,
-    math_helper::{centroid_of_points, find_perp_vec3},
+    math_helper::{centroid_of_points, find_perp_vec3, line_plane_intersect, plane_normal},
     model_type::ModelInfo,
     Transformation,
 };
@@ -308,6 +308,44 @@ where
     T: ModelInfo,
     U: BuilderState + ParamSetState,
 {
+    fn get_stem_vector(&self) -> Vector3<f64> {
+        if let Ok(stem_vec) = self
+            .adsorbate()
+            .get_vector_ab(self.stem_atom_ids()[0], self.stem_atom_ids()[1])
+        {
+            stem_vec
+        } else {
+            let stem_atom_xyz = self
+                .adsorbate()
+                .get_atom_by_id(self.stem_atom_ids()[0])
+                .unwrap()
+                .xyz();
+            let plane_atoms = self.plane_atom_ids();
+            let plane_atom_xyz = self
+                .adsorbate()
+                .get_atom_by_id(plane_atoms[0])
+                .unwrap()
+                .xyz();
+            let plane_normal = plane_normal(
+                self.adsorbate()
+                    .get_atom_by_id(plane_atoms[0])
+                    .unwrap()
+                    .xyz(),
+                self.adsorbate()
+                    .get_atom_by_id(plane_atoms[1])
+                    .unwrap()
+                    .xyz(),
+                self.adsorbate()
+                    .get_atom_by_id(plane_atoms[2])
+                    .unwrap()
+                    .xyz(),
+            )
+            .unwrap();
+            let stem_intersects_plane =
+                line_plane_intersect(stem_atom_xyz, plane_atom_xyz, &plane_normal, &plane_normal);
+            stem_intersects_plane - stem_atom_xyz
+        }
+    }
     fn ads_params(&self) -> &AdsParams {
         self.ads_params.as_ref().unwrap()
     }
@@ -414,10 +452,7 @@ where
     T: ModelInfo,
 {
     pub fn init_ads(mut self, upper_atom_id: u32) -> AdsorptionBuilder<'a, T, Calibrated> {
-        let stem_vector = self
-            .adsorbate()
-            .get_vector_ab(self.stem_atom_ids()[0], self.stem_atom_ids()[1])
-            .unwrap();
+        let stem_vector = self.get_stem_vector();
         // Align stem to point to positive x-axis
         let x_axis = Vector3::x(); // X-axis
         let stem_x_angle = x_axis.angle(&stem_vector);
@@ -439,10 +474,7 @@ where
         let translate_mat = Translation3::from(Point3::origin() - curr_stem_centroid);
         self.adsorbate_mut().translate(&translate_mat);
         // Current stem_vector.
-        let stem_vector = self
-            .adsorbate()
-            .get_vector_ab(self.stem_atom_ids()[0], self.stem_atom_ids()[1])
-            .unwrap();
+        let stem_vector = self.get_stem_vector();
         // Calculate Yaw angle to align with the host lattice sites.
         let ads_atom_nums = self.adsorbate().atoms().len();
         let yaw_angle = if ads_atom_nums == 1 {
