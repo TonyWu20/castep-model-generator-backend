@@ -123,7 +123,7 @@ where
             .fractional_coord_matrix()
             .try_inverse()
             .unwrap();
-        let msi_atoms = cell_model
+        let mut msi_atoms: Vec<Atom<MsiModel>> = cell_model
             .as_ref()
             .atoms()
             .iter()
@@ -138,6 +138,7 @@ where
                 )
             })
             .collect();
+        msi_atoms.sort_by_key(|a| a.atom_id());
         let mut msi_model = Self::new(Some(new_lat_vec), msi_atoms, MsiModel::default());
         msi_model.rotate(&rot_quatd);
         msi_model

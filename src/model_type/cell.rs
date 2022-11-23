@@ -93,7 +93,7 @@ where
             .lattice_vectors()
             .unwrap()
             .fractional_coord_matrix();
-        let cell_atoms = msi_model
+        let mut cell_atoms: Vec<Atom<CellModel>> = msi_model
             .as_ref()
             .atoms()
             .iter()
@@ -108,6 +108,7 @@ where
                 )
             })
             .collect();
+        cell_atoms.sort_by_key(|a| a.element_id());
         Self::new(Some(new_lat_vec), cell_atoms, CellModel::default())
     }
 }
