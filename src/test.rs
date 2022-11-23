@@ -36,7 +36,11 @@ mod test {
         let lat = LatticeModel::<MsiModel>::try_from(test_lat.as_str()).unwrap();
         let test_ad = read_to_string(ads_name).unwrap();
         let ads = LatticeModel::<MsiModel>::try_from(test_ad.as_str()).unwrap();
-        let carbon_chain_vector = lat.get_vector_ab(41_u32, 42_u32).unwrap();
+        let carbon_chain_vector = if target_sites.len() == 1 {
+            lat.get_vector_ab(41_u32, 42_u32).unwrap()
+        } else {
+            lat.get_vector_ab(target_sites[0], target_sites[1]).unwrap()
+        };
         let export_loc_str = "test";
         let potential_loc_str = "../C-GDY-SAC/Potentials";
         let builder = AdsorptionBuilder::new(lat);
@@ -145,14 +149,25 @@ mod test {
     fn occo_cc() {
         build(
             "OCCO_cc.msi",
-            &[41, 42],
+            &[52, 53],
             90.0,
             0.0,
             &[1, 2],
             &[1, 2],
             &[1, 2, 3],
             3,
-            "Test_Ag_OCCO_CC",
+            "Test_Ag_OCCO_CC_FR_c4",
+        );
+        build(
+            "OCCO_cc.msi",
+            &[53, 52],
+            90.0,
+            0.0,
+            &[1, 2],
+            &[1, 2],
+            &[1, 2, 3],
+            3,
+            "Test_Ag_OCCO_CC_c4_FR",
         )
     }
 }
