@@ -583,9 +583,9 @@ where
                 let yaw_quatd = UnitQuaternion::from_axis_angle(&rot_axis, angle);
                 self.adsorbate_mut().rotate(&yaw_quatd);
             }
-            StemType::VirtualStem(_) => {
+            StemType::VirtualStem(virt) => {
                 let angle = Vector3::x_axis().xy().angle(&self.ads_direction().xy());
-                let yaw_quatd = UnitQuaternion::from_axis_angle(&Vector3::z_axis(), angle);
+                let yaw_quatd = UnitQuaternion::from_axis_angle(&Unit::new_normalize(virt), angle);
                 self.adsorbate_mut().rotate(&yaw_quatd);
             }
         }
