@@ -25,7 +25,6 @@ fn test_yaml() -> Result<(), Box<dyn Error>> {
     let project_info = load_project_info("resources/project.yaml")?;
     let ads_table = AdsTab::load_table(project_info.adsorbate_table_loc())?;
     assert!(ads_table.adsorbates().is_some());
-    let hash_ads_tab = ads_table.hash_table()?;
     println!("{:?}", project_info);
     let coord_sites_dict = project_info.hash_coord_site();
     println!("{}", coord_sites_dict.get(&41).unwrap());
