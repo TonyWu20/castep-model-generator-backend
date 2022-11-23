@@ -538,12 +538,22 @@ where
     /// Yaw
     fn yaw_ads(&mut self) {
         let stem_vector = self.get_stem_vector();
-        let angle = match stem_vector {
-            StemType::RealStem(stem) => stem.xy().angle(&self.ads_direction().xy()),
-            StemType::VirtuarStem(_) => Vector3::x_axis().xy().angle(&self.ads_direction().xy()),
-        };
-        let yaw_quatd = UnitQuaternion::from_axis_angle(&Vector3::z_axis(), angle);
-        self.adsorbate_mut().rotate(&yaw_quatd);
+        match stem_vector {
+            StemType::RealStem(stem) => {
+                let stem_xy_proj = Vector3::new(stem.x, stem.y, 0.0);
+                let dir_xy_proj = Vector3::new(self.ads_direction().x, self.ads_direction().y, 0.0);
+                let angle = stem_xy_proj.angle(&dir_xy_proj);
+                let rot_axis = Unit::new_normalize(stem_xy_proj.cross(&dir_xy_proj));
+                dbg!(rot_axis);
+                let yaw_quatd = UnitQuaternion::from_axis_angle(&rot_axis, angle);
+                self.adsorbate_mut().rotate(&yaw_quatd);
+            }
+            StemType::VirtuarStem(_) => {
+                let angle = Vector3::x_axis().xy().angle(&self.ads_direction().xy());
+                let yaw_quatd = UnitQuaternion::from_axis_angle(&Vector3::z_axis(), angle);
+                self.adsorbate_mut().rotate(&yaw_quatd);
+            }
+        }
     }
     pub fn init_ads(mut self, upper_atom_id: u32) -> AdsorptionBuilder<'a, T, Calibrated> {
         // Use Tate-Bryant convention order for rotation sequence. Unfortunately, nalgebra
