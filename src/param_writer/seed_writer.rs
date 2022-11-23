@@ -42,8 +42,8 @@ where
     pub fn build(cell: &'a LatticeModel<CellModel>) -> SeedWriterBuilder<'a, T, No> {
         SeedWriterBuilder::<T, No>::new(cell)
     }
-    /// Private method to handle export directory creation.
-    fn create_export_dir(&self) -> Result<PathBuf, io::Error> {
+    /// method to handle export directory creation.
+    pub fn create_export_dir(&self) -> Result<PathBuf, io::Error> {
         let dir_name = format!("{}_{}", self.seed_name, "opt");
         let dir_loc: OsString = self.export_loc.clone().into();
         let export_loc = PathBuf::from(dir_loc).join(&dir_name);
@@ -77,6 +77,26 @@ where
                     Ok(())
                 }
             })
+    }
+    fn write_lsf_script(&self) -> Result<(), io::Error> {
+        let target_dir = self.create_export_dir()?;
+        let cell_name = self.seed_name;
+        let cmd = format!("/home-yw/Soft/msi/MS70/MaterialsStudio7.0/etc/CASTEP/bin/RunCASTEP.sh -np $NP {cell_name}");
+        let prefix = r#"APP_NAME=intelY_mid
+NP=12
+NP_PER_NODE=12
+OMP_NUM_THREADS=1
+RUN="RAW"
+
+"#;
+        let content = format!("{prefix}{cmd}");
+        let lsf_filepath = target_dir.join("MS70_YW_CASTEP.lsf");
+        fs::write(lsf_filepath, content)?;
+        Ok(())
+    }
+
+    pub fn seed_name(&self) -> &str {
+        self.seed_name
     }
 }
 
@@ -118,6 +138,7 @@ impl<'a> SeedWriter<'a, GeomOptParam> {
         let msi_path = self.path_builder(".msi")?;
         let msi_model: LatticeModel<MsiModel> = self.cell.into();
         fs::write(msi_path, msi_model.msi_export())?;
+        self.write_lsf_script()?;
         Ok(())
     }
 }
