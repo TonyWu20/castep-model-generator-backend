@@ -17,4 +17,4 @@ Cargo.lock
 
 test
 *.msi
-*.cell
+./*.cell
