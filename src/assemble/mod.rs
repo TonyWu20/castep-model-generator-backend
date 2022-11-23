@@ -6,7 +6,7 @@ use na::{Point3, Translation3, Unit, UnitQuaternion, Vector3};
 use crate::{
     builder_typestate::{No, ToAssign, Yes},
     lattice::LatticeModel,
-    math_helper::{centroid_of_points, find_perp_vec3, line_plane_intersect, plane_normal},
+    math_helper::{centroid_of_points, line_plane_intersect, plane_normal},
     model_type::ModelInfo,
     Transformation,
 };
@@ -303,47 +303,99 @@ impl<'a> AdsParamsBuilder<'a, Yes, Yes, Yes, Yes> {
     }
 }
 
+enum StemType {
+    RealStem(Vector3<f64>),
+    VirtuarStem(Vector3<f64>),
+}
+
+impl From<StemType> for Vector3<f64> {
+    fn from(item: StemType) -> Self {
+        match item {
+            StemType::RealStem(vec) => vec,
+            StemType::VirtuarStem(vec) => vec,
+        }
+    }
+}
+
 impl<'a, T, U> AdsorptionBuilder<'a, T, U>
 where
     T: ModelInfo,
     U: BuilderState + ParamSetState,
 {
-    fn get_stem_vector(&self) -> Vector3<f64> {
+    fn get_stem_vector(&self) -> StemType {
         if let Ok(stem_vec) = self
             .adsorbate()
             .get_vector_ab(self.stem_atom_ids()[0], self.stem_atom_ids()[1])
         {
-            stem_vec
+            StemType::RealStem(stem_vec)
         } else {
             let stem_atom_xyz = self
                 .adsorbate()
                 .get_atom_by_id(self.stem_atom_ids()[0])
                 .unwrap()
                 .xyz();
-            let plane_atoms = self.plane_atom_ids();
             let plane_atom_xyz = self
                 .adsorbate()
-                .get_atom_by_id(plane_atoms[0])
+                .get_atom_by_id(self.plane_atom_ids()[0])
                 .unwrap()
                 .xyz();
-            let plane_normal = plane_normal(
-                self.adsorbate()
-                    .get_atom_by_id(plane_atoms[0])
-                    .unwrap()
-                    .xyz(),
-                self.adsorbate()
-                    .get_atom_by_id(plane_atoms[1])
-                    .unwrap()
-                    .xyz(),
-                self.adsorbate()
-                    .get_atom_by_id(plane_atoms[2])
-                    .unwrap()
-                    .xyz(),
-            )
-            .unwrap();
+            let plane_normal = self.get_plane_normal();
             let stem_intersects_plane =
                 line_plane_intersect(stem_atom_xyz, plane_atom_xyz, &plane_normal, &plane_normal);
-            stem_intersects_plane - stem_atom_xyz
+            StemType::VirtuarStem(stem_intersects_plane - stem_atom_xyz)
+        }
+    }
+    fn get_plane_normal(&self) -> Vector3<f64> {
+        let plane_atoms = self.plane_atom_ids();
+        plane_normal(
+            self.adsorbate()
+                .get_atom_by_id(plane_atoms[0])
+                .unwrap()
+                .xyz(),
+            self.adsorbate()
+                .get_atom_by_id(plane_atoms[1])
+                .unwrap()
+                .xyz(),
+            self.adsorbate()
+                .get_atom_by_id(plane_atoms[2])
+                .unwrap()
+                .xyz(),
+        )
+        .unwrap()
+    }
+    fn move_to_origin(&mut self) {
+        let curr_stem_centroid = na::center(
+            self.adsorbate()
+                .get_atom_by_id(self.stem_atom_ids()[0])
+                .unwrap()
+                .xyz(),
+            self.adsorbate()
+                .get_atom_by_id(self.stem_atom_ids()[1])
+                .unwrap()
+                .xyz(),
+        );
+        let translate_mat = Translation3::from(Point3::origin() - curr_stem_centroid);
+        self.adsorbate_mut().translate(&translate_mat);
+    }
+    fn flip_up(&mut self, upper_atom_id: u32) {
+        let cd_atom_z = self
+            .adsorbate()
+            .get_atom_by_id(self.coord_atom_ids()[0])
+            .unwrap()
+            .xyz()
+            .z;
+        if self
+            .adsorbate()
+            .get_atom_by_id(upper_atom_id)
+            .unwrap()
+            .xyz()
+            .z
+            < cd_atom_z
+        {
+            // Flip up by 180 degrees
+            // The rotation axis is set to be x-axis, so this must be conducted immediately after rolling.
+            let rotate_quatd = UnitQuaternion::from_axis_angle(&Vector3::x_axis(), PI);
+            self.adsorbate_mut().rotate(&rotate_quatd);
         }
     }
     fn ads_params(&self) -> &AdsParams {
@@ -451,86 +503,65 @@ impl<'a, T> AdsorptionBuilder<'a, T, ParamSet>
 where
     T: ModelInfo,
 {
-    pub fn init_ads(mut self, upper_atom_id: u32) -> AdsorptionBuilder<'a, T, Calibrated> {
-        let stem_vector = self.get_stem_vector();
-        // Align stem to point to positive x-axis
-        let x_axis = Vector3::x(); // X-axis
-        let stem_x_angle = x_axis.angle(&stem_vector);
-        // Stem points toward positive x-axis
-        let rotation_axis = Unit::new_normalize(stem_vector.cross(&x_axis));
-        let rotate_quatd = UnitQuaternion::from_axis_angle(&rotation_axis, stem_x_angle);
-        self.adsorbate_mut().rotate(&rotate_quatd);
-        // Aligned to x-axis, move centroid of the stem to the origin.
-        let curr_stem_centroid = na::center(
-            self.adsorbate()
-                .get_atom_by_id(self.stem_atom_ids()[0])
-                .unwrap()
-                .xyz(),
-            self.adsorbate()
-                .get_atom_by_id(self.stem_atom_ids()[1])
-                .unwrap()
-                .xyz(),
-        );
-        let translate_mat = Translation3::from(Point3::origin() - curr_stem_centroid);
-        self.adsorbate_mut().translate(&translate_mat);
-        // Current stem_vector.
-        let stem_vector = self.get_stem_vector();
-        // Calculate Yaw angle to align with the host lattice sites.
+    /// "Roll" the plane. The purpose is to lay the specified plane around the stem to the proper angle.
+    fn roll_ads(&mut self, upper_atom_id: u32) {
         let ads_atom_nums = self.adsorbate().atoms().len();
-        let yaw_angle = if ads_atom_nums == 1 {
-            0.0
-        } else {
-            stem_vector.xy().angle(&self.ads_direction().xy())
-        };
-        // Determine the roll angle. The purpose is to lay the specified plane around the stem to the proper angle.
-        let roll_angle = match ads_atom_nums {
-            1 => 0.0,
-            2 => 0.0,
+        match ads_atom_nums {
+            1 => {}
+            2 => {}
             _ => {
-                let plane_ba = self
-                    .adsorbate()
-                    .get_vector_ab(self.plane_atom_ids()[0], self.plane_atom_ids()[1])
-                    .unwrap();
-                let plane_ca = self
-                    .adsorbate()
-                    .get_vector_ab(self.plane_atom_ids()[0], self.plane_atom_ids()[2])
-                    .unwrap();
-                let plane_normal = plane_ba.cross(&plane_ca);
-                let z_axis = Vector3::z();
-                plane_normal.angle(&z_axis) - self.adsorbate_plane_angle() * PI / 180.0
+                let plane_normal = self.get_plane_normal();
+                let plane_angle_rad = (90.0 - self.adsorbate_plane_angle()).to_radians();
+                let target_angle_vec =
+                    Vector3::new(0.0, plane_angle_rad.cos(), plane_angle_rad.sin());
+                let roll_quatd =
+                    UnitQuaternion::rotation_between(&plane_normal, &target_angle_vec).unwrap();
+                self.adsorbate_mut().rotate(&roll_quatd);
             }
         };
-        // Determine the pitch angle. This determines the angle between the stem and target host sites.
-        let pitch_angle = match ads_atom_nums {
-            1 => 0.0,
-            _ => self.adsorbate_stem_coord_angle() * PI / 180.0,
+        // Flip up check instantly
+        self.flip_up(upper_atom_id);
+    }
+    /// Determine the pitch angle. This determines the angle between the stem and target host sites.
+    /// The logic for pitch do not differ on type of stem.
+    fn pitch_ads(&mut self) {
+        let stem_vector: Vector3<f64> = self.get_stem_vector().into();
+        let coord_dir_vec = Vector3::new(
+            self.adsorbate_stem_coord_angle().to_radians().cos(),
+            0.0,
+            -1.0 * self.adsorbate_stem_coord_angle().to_radians().sin(),
+        );
+        let pitch_angle = stem_vector.angle(&coord_dir_vec);
+        let pitch_quatd = UnitQuaternion::from_axis_angle(&Vector3::y_axis(), pitch_angle);
+        self.adsorbate_mut().rotate(&pitch_quatd);
+    }
+    /// Yaw
+    fn yaw_ads(&mut self) {
+        let stem_vector = self.get_stem_vector();
+        let angle = match stem_vector {
+            StemType::RealStem(stem) => stem.xy().angle(&self.ads_direction().xy()),
+            StemType::VirtuarStem(_) => Vector3::x_axis().xy().angle(&self.ads_direction().xy()),
         };
-        let rotate_quatd = UnitQuaternion::from_euler_angles(roll_angle, pitch_angle, yaw_angle);
+        let yaw_quatd = UnitQuaternion::from_axis_angle(&Vector3::z_axis(), angle);
+        self.adsorbate_mut().rotate(&yaw_quatd);
+    }
+    pub fn init_ads(mut self, upper_atom_id: u32) -> AdsorptionBuilder<'a, T, Calibrated> {
+        // Use Tate-Bryant convention order for rotation sequence. Unfortunately, nalgebra
+        // does not support this order natively. We have to implement the order by ourselves.
+        let stem_vector = self.get_stem_vector();
+        let rotate_quatd = match stem_vector {
+            StemType::RealStem(stem) => {
+                UnitQuaternion::rotation_between(&stem, &Vector3::x_axis()).unwrap()
+            }
+            StemType::VirtuarStem(vstem) => {
+                UnitQuaternion::rotation_between(&vstem, &Vector3::x_axis()).unwrap()
+            }
+        };
         self.adsorbate_mut().rotate(&rotate_quatd);
-        let cd_atom_z = self
-            .adsorbate()
-            .get_atom_by_id(self.coord_atom_ids()[0])
-            .unwrap()
-            .xyz()
-            .z;
-        if self
-            .adsorbate()
-            .get_atom_by_id(upper_atom_id)
-            .unwrap()
-            .xyz()
-            .z
-            < cd_atom_z
-        {
-            let curr_stem = self
-                .adsorbate()
-                .get_vector_ab(self.stem_atom_ids()[0], self.stem_atom_ids()[1])
-                .unwrap();
-            // The rotation axis should be perpendicular to the stem axis.
-            let rot_axis = Unit::new_normalize(find_perp_vec3(&curr_stem));
-            // Flip up by 180 degrees
-            let rotate_quatd = UnitQuaternion::from_axis_angle(&rot_axis, PI);
-            self.adsorbate_mut().rotate(&rotate_quatd);
-        }
+        self.move_to_origin();
+        self.roll_ads(upper_atom_id);
+        self.pitch_ads();
+        self.yaw_ads();
         let Self {
             host_lattice,
             adsorbate,
