@@ -22,3 +22,15 @@ impl Display for CollinearPoints {
 }
 
 impl Error for CollinearPoints {}
+
+#[derive(Debug)]
+/// Error type when coordinate becomes NaN
+pub struct InvalidCoord();
+
+impl Display for InvalidCoord {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NaN value exists in coordinates!")
+    }
+}
+
+impl Error for InvalidCoord {}
