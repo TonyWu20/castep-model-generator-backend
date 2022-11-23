@@ -561,7 +561,7 @@ where
             -1.0 * self.adsorbate_stem_coord_angle().to_radians().sin(),
         );
         // Only rotate when the two xz vectors are not collinear
-        if (stem_vector_xz.dot(&coord_dir_vec).abs() - 1.0) > f64::EPSILON {
+        if (stem_vector_xz.dot(&coord_dir_vec).abs() - 1.0).abs() > 0.001 * f64::EPSILON {
             let pitch_angle = stem_vector_xz.angle(&coord_dir_vec);
             let rot_axis = Unit::new_normalize(stem_vector.cross(&coord_dir_vec));
             let pitch_quatd = UnitQuaternion::from_axis_angle(&rot_axis, pitch_angle);
