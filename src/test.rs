@@ -141,4 +141,18 @@ mod test {
             "Test_Ag_CH3",
         )
     }
+    #[test]
+    fn occo_cc() {
+        build(
+            "OCCO_cc.msi",
+            &[41, 42],
+            90.0,
+            0.0,
+            &[1, 2],
+            &[1, 2],
+            &[1, 2, 3],
+            3,
+            "Test_Ag_OCCO_CC",
+        )
+    }
 }
