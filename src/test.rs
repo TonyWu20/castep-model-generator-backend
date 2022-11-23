@@ -170,4 +170,18 @@ mod test {
             "Test_Ag_OCCO_CC_c4_FR",
         )
     }
+    #[test]
+    fn ch3ch2() {
+        build(
+            "CH3CH2.msi",
+            &[41],
+            30.0,
+            0.0,
+            &[2, 3],
+            &[3],
+            &[2, 3, 5],
+            1,
+            "Test_Ag_CH3CH2",
+        )
+    }
 }

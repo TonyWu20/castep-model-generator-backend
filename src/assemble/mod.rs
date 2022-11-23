@@ -5,6 +5,7 @@ use na::{Point3, Translation3, Unit, UnitQuaternion, Vector3};
 
 use crate::{
     builder_typestate::{No, ToAssign, Yes},
+    error::InvalidCoord,
     lattice::LatticeModel,
     math_helper::{centroid_of_points, line_plane_intersect, plane_normal},
     model_type::ModelInfo,
@@ -503,8 +504,17 @@ impl<'a, T> AdsorptionBuilder<'a, T, ParamSet>
 where
     T: ModelInfo + std::fmt::Debug,
 {
+    fn check_coordinate(&self) -> Result<(), InvalidCoord> {
+        for atom in self.adsorbate().atoms() {
+            let xyz = atom.xyz();
+            if xyz.x.is_nan() || xyz.y.is_nan() || xyz.z.is_nan() {
+                return Err(InvalidCoord());
+            }
+        }
+        Ok(())
+    }
     /// "Roll" the plane. The purpose is to lay the specified plane around the stem to the proper angle.
-    fn roll_ads(&mut self, upper_atom_id: u32) {
+    fn roll_ads(&mut self, upper_atom_id: u32) -> Result<(), InvalidCoord> {
         let ads_atom_nums = self.adsorbate().atoms().len();
         match ads_atom_nums {
             1 => {}
@@ -521,10 +531,11 @@ where
         };
         // Flip up check instantly
         self.flip_up(upper_atom_id);
+        self.check_coordinate()
     }
     /// Determine the pitch angle. This determines the angle between the stem and target host sites.
     /// The logic for pitch do not differ on type of stem.
-    fn pitch_ads(&mut self) {
+    fn pitch_ads(&mut self) -> Result<(), InvalidCoord> {
         let stem_vector: Vector3<f64> = self.get_stem_vector().into();
         let coord_atom_xyz = self
             .adsorbate()
@@ -532,27 +543,36 @@ where
             .unwrap()
             .xyz();
         let origin_to_coord = coord_atom_xyz - Point3::origin();
-        let prod = origin_to_coord.dot(&stem_vector);
+        // Compute dot product of `stem_vector` and `origin_to_coord` to see if they are in same x-direction
+        let stem_dot_oc = origin_to_coord.dot(&stem_vector);
         // Make sure pitch up/down towards the coord atom
-        let stem_vector = if prod < 0.0 {
+        let stem_vector = if stem_dot_oc < 0.0 {
             stem_vector * -1.0
         } else {
             stem_vector
         };
-        let sign = if prod < 0.0 { -1.0 } else { 1.0 };
-        let stem_vector_xz = Vector3::new(stem_vector.x, 0.0, stem_vector.z);
+        // The x-direction to construct the `coord_dir_vec` --------------------------------|
+        let sign = if stem_dot_oc < 0.0 { -1.0 } else { 1.0 }; //                           |
+        let stem_vector_xz = Vector3::new(stem_vector.x, 0.0, stem_vector.z).normalize(); //|
         let coord_dir_vec = Vector3::new(
+            // Apply the direction sign here <----------------------------------------------|
             sign * self.adsorbate_stem_coord_angle().to_radians().cos(),
             0.0,
             -1.0 * self.adsorbate_stem_coord_angle().to_radians().sin(),
         );
-        let pitch_angle = stem_vector_xz.angle(&coord_dir_vec);
-        let rot_axis = Unit::new_normalize(stem_vector.cross(&coord_dir_vec));
-        let pitch_quatd = UnitQuaternion::from_axis_angle(&rot_axis, pitch_angle);
-        self.adsorbate_mut().rotate(&pitch_quatd);
+        // Only rotate when the two xz vectors are not collinear
+        if (stem_vector_xz.dot(&coord_dir_vec).abs() - 1.0) > f64::EPSILON {
+            let pitch_angle = stem_vector_xz.angle(&coord_dir_vec);
+            let rot_axis = Unit::new_normalize(stem_vector.cross(&coord_dir_vec));
+            let pitch_quatd = UnitQuaternion::from_axis_angle(&rot_axis, pitch_angle);
+            self.adsorbate_mut().rotate(&pitch_quatd);
+            self.check_coordinate()
+        } else {
+            Ok(())
+        }
     }
     /// Yaw
-    fn yaw_ads(&mut self) {
+    fn yaw_ads(&mut self) -> Result<(), InvalidCoord> {
         let stem_vector = self.get_stem_vector();
         match stem_vector {
             StemType::RealStem(stem) => {
@@ -569,6 +589,7 @@ where
                 self.adsorbate_mut().rotate(&yaw_quatd);
             }
         }
+        self.check_coordinate()
     }
     pub fn init_ads(mut self, upper_atom_id: u32) -> AdsorptionBuilder<'a, T, Calibrated> {
         // Use Tate-Bryant convention order for rotation sequence. Unfortunately, nalgebra
@@ -584,9 +605,12 @@ where
         };
         self.adsorbate_mut().rotate(&rotate_quatd);
         self.move_to_origin();
-        self.roll_ads(upper_atom_id);
-        self.pitch_ads();
-        self.yaw_ads();
+        self.roll_ads(upper_atom_id)
+            .unwrap_or_else(|e| panic!("{e} at func: roll_ads"));
+        self.pitch_ads()
+            .unwrap_or_else(|e| panic!("{e} at func: pitch_ads"));
+        self.yaw_ads()
+            .unwrap_or_else(|e| panic!("{e} at func: yaw_ads"));
         let Self {
             host_lattice,
             adsorbate,
