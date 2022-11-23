@@ -606,11 +606,11 @@ where
         self.adsorbate_mut().rotate(&rotate_quatd);
         self.move_to_origin();
         self.roll_ads(upper_atom_id)
-            .unwrap_or_else(|e| panic!("{e} at func: roll_ads"));
+            .unwrap_or_else(|e| panic!("{:?} {e} at func: roll_ads", self.adsorbate()));
         self.pitch_ads()
-            .unwrap_or_else(|e| panic!("{e} at func: pitch_ads"));
+            .unwrap_or_else(|e| panic!("{:?} {e} at func: pitch_ads", self.adsorbate()));
         self.yaw_ads()
-            .unwrap_or_else(|e| panic!("{e} at func: yaw_ads"));
+            .unwrap_or_else(|e| panic!("{:?} {e} at func: yaw_ads", self.adsorbate()));
         let Self {
             host_lattice,
             adsorbate,
