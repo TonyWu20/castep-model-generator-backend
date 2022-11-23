@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use na::UnitQuaternion;
+
 pub mod adsorbate;
 pub mod assemble;
 pub mod atom;
@@ -17,6 +19,6 @@ extern crate castep_periodic_table as cpt;
 extern crate nalgebra as na;
 
 pub trait Transformation {
-    fn rotate(&mut self, rotate_quatd: &na::UnitQuaternion<f64>);
+    fn rotate(&mut self, rotate_quatd: &UnitQuaternion<f64>);
     fn translate(&mut self, translate_matrix: &na::Translation<f64, 3>);
 }
