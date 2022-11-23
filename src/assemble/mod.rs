@@ -305,14 +305,14 @@ impl<'a> AdsParamsBuilder<'a, Yes, Yes, Yes, Yes> {
 
 enum StemType {
     RealStem(Vector3<f64>),
-    VirtuarStem(Vector3<f64>),
+    VirtualStem(Vector3<f64>),
 }
 
 impl From<StemType> for Vector3<f64> {
     fn from(item: StemType) -> Self {
         match item {
             StemType::RealStem(vec) => vec,
-            StemType::VirtuarStem(vec) => vec,
+            StemType::VirtualStem(vec) => vec,
         }
     }
 }
@@ -342,7 +342,7 @@ where
             let plane_normal = self.get_plane_normal();
             let stem_intersects_plane =
                 line_plane_intersect(stem_atom_xyz, plane_atom_xyz, &plane_normal, &plane_normal);
-            StemType::VirtuarStem(stem_intersects_plane - stem_atom_xyz)
+            StemType::VirtualStem(stem_intersects_plane - stem_atom_xyz)
         }
     }
     fn get_plane_normal(&self) -> Vector3<f64> {
@@ -501,7 +501,7 @@ impl<'a, T: ModelInfo> AdsorptionBuilder<'a, T, Imported> {
 
 impl<'a, T> AdsorptionBuilder<'a, T, ParamSet>
 where
-    T: ModelInfo,
+    T: ModelInfo + std::fmt::Debug,
 {
     /// "Roll" the plane. The purpose is to lay the specified plane around the stem to the proper angle.
     fn roll_ads(&mut self, upper_atom_id: u32) {
@@ -526,13 +526,29 @@ where
     /// The logic for pitch do not differ on type of stem.
     fn pitch_ads(&mut self) {
         let stem_vector: Vector3<f64> = self.get_stem_vector().into();
+        let coord_atom_xyz = self
+            .adsorbate()
+            .get_atom_by_id(self.coord_atom_ids()[0])
+            .unwrap()
+            .xyz();
+        let origin_to_coord = coord_atom_xyz - Point3::origin();
+        let prod = origin_to_coord.dot(&stem_vector);
+        // Make sure pitch up/down towards the coord atom
+        let stem_vector = if prod < 0.0 {
+            stem_vector * -1.0
+        } else {
+            stem_vector
+        };
+        let sign = if prod < 0.0 { -1.0 } else { 1.0 };
+        let stem_vector_xz = Vector3::new(stem_vector.x, 0.0, stem_vector.z);
         let coord_dir_vec = Vector3::new(
-            self.adsorbate_stem_coord_angle().to_radians().cos(),
+            sign * self.adsorbate_stem_coord_angle().to_radians().cos(),
             0.0,
             -1.0 * self.adsorbate_stem_coord_angle().to_radians().sin(),
         );
-        let pitch_angle = stem_vector.angle(&coord_dir_vec);
-        let pitch_quatd = UnitQuaternion::from_axis_angle(&Vector3::y_axis(), pitch_angle);
+        let pitch_angle = stem_vector_xz.angle(&coord_dir_vec);
+        let rot_axis = Unit::new_normalize(stem_vector.cross(&coord_dir_vec));
+        let pitch_quatd = UnitQuaternion::from_axis_angle(&rot_axis, pitch_angle);
         self.adsorbate_mut().rotate(&pitch_quatd);
     }
     /// Yaw
@@ -544,11 +560,10 @@ where
                 let dir_xy_proj = Vector3::new(self.ads_direction().x, self.ads_direction().y, 0.0);
                 let angle = stem_xy_proj.angle(&dir_xy_proj);
                 let rot_axis = Unit::new_normalize(stem_xy_proj.cross(&dir_xy_proj));
-                dbg!(rot_axis);
                 let yaw_quatd = UnitQuaternion::from_axis_angle(&rot_axis, angle);
                 self.adsorbate_mut().rotate(&yaw_quatd);
             }
-            StemType::VirtuarStem(_) => {
+            StemType::VirtualStem(_) => {
                 let angle = Vector3::x_axis().xy().angle(&self.ads_direction().xy());
                 let yaw_quatd = UnitQuaternion::from_axis_angle(&Vector3::z_axis(), angle);
                 self.adsorbate_mut().rotate(&yaw_quatd);
@@ -563,7 +578,7 @@ where
             StemType::RealStem(stem) => {
                 UnitQuaternion::rotation_between(&stem, &Vector3::x_axis()).unwrap()
             }
-            StemType::VirtuarStem(vstem) => {
+            StemType::VirtualStem(vstem) => {
                 UnitQuaternion::rotation_between(&vstem, &Vector3::x_axis()).unwrap()
             }
         };
