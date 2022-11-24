@@ -99,13 +99,15 @@ where
             .iter()
             .map(|atom| -> Atom<CellModel> {
                 let fractional_coord = fractional_coord_matrix * atom.xyz();
-                Atom::new(
+                let mut new_atom = Atom::new(
                     atom.element_symbol().to_string(),
                     atom.element_id(),
-                    fractional_coord,
+                    *atom.xyz(),
                     atom.atom_id(),
                     CellModel::default(),
-                )
+                );
+                new_atom.set_fractional_xyz(Some(fractional_coord));
+                new_atom
             })
             .collect();
         cell_atoms.sort_by_key(|a| a.element_id());
@@ -373,9 +375,9 @@ impl Display for Atom<CellModel> {
                 f,
                 "{:>3}{:20.16}{:20.16}{:20.16} SPIN={:14.10}",
                 atom_element,
-                self.xyz().x,
-                self.xyz().y,
-                self.xyz().z,
+                self.fractional_xyz().unwrap().x,
+                self.fractional_xyz().unwrap().y,
+                self.fractional_xyz().unwrap().z,
                 spin as f64
             )
         } else {
@@ -383,9 +385,9 @@ impl Display for Atom<CellModel> {
                 f,
                 "{:>3}{:20.16}{:20.16}{:20.16}",
                 atom_element,
-                self.xyz().x,
-                self.xyz().y,
-                self.xyz().z
+                self.fractional_xyz().unwrap().x,
+                self.fractional_xyz().unwrap().y,
+                self.fractional_xyz().unwrap().z,
             )
         }
     }

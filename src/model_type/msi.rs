@@ -116,23 +116,15 @@ where
             MsiModel::default(),
         );
         // The inverse of the fractional coord matrix is the cartesian coord matrix
-        let frac_to_cart_matrix = cell_model
-            .as_ref()
-            .lattice_vectors()
-            .unwrap()
-            .fractional_coord_matrix()
-            .try_inverse()
-            .unwrap();
         let mut msi_atoms: Vec<Atom<MsiModel>> = cell_model
             .as_ref()
             .atoms()
             .iter()
             .map(|atom| -> Atom<MsiModel> {
-                let cart_coord = frac_to_cart_matrix * atom.xyz();
                 Atom::new(
                     atom.element_symbol().to_string(),
                     atom.element_id(),
-                    cart_coord,
+                    *atom.xyz(),
                     atom.atom_id(),
                     MsiModel::default(),
                 )
