@@ -4,21 +4,25 @@ use std::cmp::Ordering;
 use na::Point3;
 /// Struct that defines an atom.
 #[derive(Debug, Clone)]
-pub struct Atom<T: ModelInfo + Clone> {
+pub struct Atom<T: ModelInfo> {
     /// The symbol of the element.
     element_symbol: String,
     /// The atomic number of the element in periodic table.
     element_id: u32,
     /// The cartesian coordinate of the atom.
     xyz: Point3<f64>,
+    /// The fractional coordinate of the atom in a lattice.
+    /// Optional since it relies on lattice vectors.
+    fractional_xyz: Option<Point3<f64>>,
     /// The id of the atom in the parsed model.
     atom_id: u32,
-    model_type: T,
+    /// Format type
+    format_type: T,
 }
 
 impl<T> Atom<T>
 where
-    T: ModelInfo + Clone,
+    T: ModelInfo,
 {
     /// Creates a new [`Atom`].
     pub fn new(
@@ -32,8 +36,9 @@ where
             element_symbol,
             element_id,
             xyz,
+            fractional_xyz: None,
             atom_id,
-            model_type,
+            format_type: model_type,
         }
     }
 
@@ -76,11 +81,19 @@ where
 
     /// Returns a reference to the format of this [`Atom<Format>`].
     pub fn model_type(&self) -> &T {
-        &self.model_type
+        &self.format_type
     }
     /// Sets the format of this [`Atom<Format>`].
     pub fn set_model_type(&mut self, model_type: T) {
-        self.model_type = model_type;
+        self.format_type = model_type;
+    }
+
+    pub fn fractional_xyz(&self) -> Option<&Point3<f64>> {
+        self.fractional_xyz.as_ref()
+    }
+
+    pub fn set_fractional_xyz(&mut self, fractional_xyz: Option<Point3<f64>>) {
+        self.fractional_xyz = fractional_xyz;
     }
 }
 
@@ -93,7 +106,7 @@ where
 
 impl<T> Transformation for Atom<T>
 where
-    T: ModelInfo + Clone,
+    T: ModelInfo,
 {
     fn rotate(&mut self, rotate_quatd: &na::UnitQuaternion<f64>) {
         self.set_xyz(rotate_quatd.transform_point(self.xyz()))
@@ -106,7 +119,7 @@ where
 
 impl<T> Ord for Atom<T>
 where
-    T: ModelInfo + Clone,
+    T: ModelInfo,
 {
     fn cmp(&self, other: &Self) -> Ordering {
         self.atom_id.cmp(&other.atom_id)
@@ -115,7 +128,7 @@ where
 
 impl<T> PartialOrd for Atom<T>
 where
-    T: ModelInfo + Clone,
+    T: ModelInfo,
 {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
@@ -124,11 +137,11 @@ where
 
 impl<T> PartialEq for Atom<T>
 where
-    T: ModelInfo + Clone,
+    T: ModelInfo,
 {
     fn eq(&self, other: &Self) -> bool {
         self.atom_id == other.atom_id
     }
 }
 
-impl<T> Eq for Atom<T> where T: ModelInfo + Clone {}
+impl<T> Eq for Atom<T> where T: ModelInfo {}
