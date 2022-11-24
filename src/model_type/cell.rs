@@ -328,7 +328,10 @@ impl LatticeModel<CellModel> {
                     };
                     Ok(())
                 } else {
-                    panic!("Error while reading potential file for element: {}", elm)
+                    panic!(
+                        "Error while reading potential file for element: {}, {}",
+                        elm, potential_path
+                    )
                 }
             })?;
         Ok(energy)
