@@ -28,4 +28,5 @@ serde = { version = "1.*", features = ["derive"] }
 rayon = "1.*"
 glob = "0"
 nom = "7"
+castep-model-core = "0.*"
 castep-periodic-table = "0.1.*"
