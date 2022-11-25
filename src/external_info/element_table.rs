@@ -21,6 +21,12 @@ pub struct ElmTab {
     pub elements: Option<Vec<Element>>,
 }
 
+impl ElmTab {
+    pub fn elements(&self) -> Option<&Vec<Element>> {
+        self.elements.as_ref()
+    }
+}
+
 impl YamlTable for ElmTab {
     type Table = ElmTab;
     type TableItem = Element;

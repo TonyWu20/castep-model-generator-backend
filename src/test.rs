@@ -1,79 +1,185 @@
 #[cfg(test)]
 mod test {
-    use std::error::Error;
-    use std::fs;
-
-    use crate::assemble::AdsAddition;
-    use crate::cell::CellOutput;
-    use crate::external_info::adsorbate_table::AdsTab;
-    use crate::external_info::element_table;
-    use crate::external_info::project::load_project_info;
-    use crate::external_info::YamlTable;
-    use crate::lattice::Lattice;
-    use crate::parser::msi_parser::parse_adsorbate;
-    use crate::{parser, Export};
+    use crate::assemble::{AdsParamsBuilder, AdsorptionBuilder};
+    use castep_core::{
+        builder_typestate::No,
+        param_writer::{
+            castep_param::{BandStructureParam, GeomOptParam},
+            seed_writer::SeedWriter,
+        },
+        CellModel, LatticeModel, MsiModel,
+    };
+    use std::fs::{read_to_string, write};
 
     #[test]
-    fn test_parse_ads() -> Result<(), Box<dyn Error>> {
-        let ads_table = AdsTab::load_table("./resources/ads_table.yaml")?;
-        let parent_dir = ads_table.directory().to_string();
-        let hash_table = ads_table.hash_table()?;
-        let ads_info = hash_table.get("CH2CHOH").unwrap();
-        let parsed_ads = parse_adsorbate(ads_info, &parent_dir)?;
-        println!("{:?}", parsed_ads.atoms_vec());
-        Ok(())
+    fn test_conversion() {
+        let test_lat = read_to_string("SAC_GDY_Ag.msi").unwrap();
+        let msi_lat: LatticeModel<MsiModel> = LatticeModel::try_from(test_lat.as_str()).unwrap();
+        let cell_lat: LatticeModel<CellModel> = msi_lat.into();
+        let msi_back: LatticeModel<MsiModel> = cell_lat.into();
+        write("SAC_GDY_Ag_back.msi", msi_back.msi_export()).unwrap();
+    }
+    fn build(
+        ads_name: &str,
+        target_sites: &[u32], // target_sites, plane_angle, coord_angle, stem_atom_ids, coord_atom_ids, plane_atom_ids, stem_name
+        plane_angle: f64,
+        coord_angle: f64,
+        stem_atom_ids: &[u32],
+        coord_atom_ids: &[u32],
+        plane_atom_ids: &[u32],
+        upper_atom_id: u32,
+        seed_name: &str,
+    ) {
+        let test_lat = read_to_string("SAC_GDY_Ag.msi").unwrap();
+        let lat = LatticeModel::<MsiModel>::try_from(test_lat.as_str()).unwrap();
+        let test_ad = read_to_string(ads_name).unwrap();
+        let ads = LatticeModel::<MsiModel>::try_from(test_ad.as_str()).unwrap();
+        let carbon_chain_vector = if target_sites.len() == 1 {
+            lat.get_vector_ab(41_u32, 42_u32).unwrap()
+        } else {
+            lat.get_vector_ab(target_sites[0], target_sites[1]).unwrap()
+        };
+        let export_loc_str = "test";
+        let potential_loc_str = "../C-GDY-SAC/Potentials";
+        let builder = AdsorptionBuilder::new(lat);
+        println!("Seed: {}", seed_name);
+        let built_lattice = builder
+            .add_adsorbate(ads)
+            .with_location_at_sites(target_sites)
+            .with_ads_params(
+                AdsParamsBuilder::<No, No, No, No>::new()
+                    .with_ads_direction(&carbon_chain_vector)
+                    .with_plane_angle(plane_angle)
+                    .with_bond_length(1.4)
+                    // .with_stem_coord_angle(45.0) // OCC
+                    .with_stem_coord_angle(coord_angle) // CO
+                    .with_coord_atom_ids(coord_atom_ids)
+                    .with_stem_atom_ids(stem_atom_ids)
+                    // .with_plane_atom_ids(&[1, 2, 3]) // OCC
+                    .with_plane_atom_ids(plane_atom_ids) // CO
+                    .finish(),
+            )
+            .init_ads(upper_atom_id)
+            .place_adsorbate()
+            .build_adsorbed_lattice();
+        let built_cell: LatticeModel<CellModel> = built_lattice.into();
+        let geom_seed_writer: SeedWriter<GeomOptParam> = SeedWriter::build(&built_cell)
+            // .with_seed_name("Test_ag_OCC")
+            .with_seed_name(seed_name)
+            .with_export_loc(export_loc_str)
+            .with_potential_loc(potential_loc_str)
+            .build();
+        geom_seed_writer.write_seed_files().unwrap();
+        geom_seed_writer.copy_potentials().unwrap();
+        let bs_writer: SeedWriter<BandStructureParam> = geom_seed_writer.into();
+        bs_writer.write_seed_files().unwrap();
     }
     #[test]
-    fn add_ads_to_lat() -> Result<(), Box<dyn Error>> {
-        let filename = "./resources/GDY_tri.msi";
-        let base_lat: Lattice = parser::msi_parser::parse_lattice(filename)?;
-        // change_atom_element(
-        //     base_lat.atoms_vec_mut().get_mut_atom_by_id(73).unwrap(),
-        //     "Mn",
-        //     25,
-        // );
-        // change_atom_element(
-        //     base_lat.atoms_vec_mut().get_mut_atom_by_id(74).unwrap(),
-        //     "Mn",
-        //     25,
-        // );
-        // change_atom_element(
-        //     base_lat.atoms_vec_mut().get_mut_atom_by_id(75).unwrap(),
-        //     "Ni",
-        //     28,
-        // );
-        // // let frac_mat = fractional_coord_matrix(&base_lat);
-        // base_lat.update_base_name();
-        let ads_table = AdsTab::load_table("./resources/ads_table.yaml")?;
-        let parent_dir = ads_table.directory().to_string();
-        let hash_table = ads_table.hash_table()?;
-        let ads_info = hash_table.get("CH2CHOH").unwrap();
-        let mut parsed_ads = parse_adsorbate(ads_info, &parent_dir)?;
-        let project_info = load_project_info("./resources/project.yaml")?;
-        let coord_site_dict = project_info.hash_coord_site();
-        let coord_cases = &project_info.coord_cases()[0];
-        let element_table = element_table::ElmTab::load_table("./resources/element_table.yaml")?;
-        let element_info = element_table.hash_table()?;
-        coord_cases
-            .get_cases(false)
-            .iter()
-            .try_for_each(|case| -> Result<(), Box<dyn Error>> {
-                let mut new_lat = base_lat.clone();
-                new_lat.add_ads(
-                    &mut parsed_ads,
-                    case.0,
-                    case.1,
-                    1.4,
-                    false,
-                    &coord_site_dict,
-                )?;
-                let result = new_lat.format_output();
-                let cell = new_lat.cell_output(&element_info);
-                let cell_name = new_lat.lattice_name();
-                fs::write("test.msi", result)?;
-                fs::write(format!("{}.cell", cell_name), cell)?;
-                Ok(())
-            })?;
-        Ok(())
+    fn test_builder() {
+        build(
+            "OCC.msi",
+            &[41],
+            0.0,
+            50.0,
+            &[1, 2],
+            &[1],
+            &[1, 2, 3],
+            3,
+            "Test_Ag_OCC",
+        );
+        build(
+            "CO.msi",
+            &[41],
+            0.0,
+            90.0,
+            &[1, 2],
+            &[1],
+            &[1, 2, 2],
+            2,
+            "Test_Ag_CO",
+        );
+        build(
+            "COH.msi",
+            &[41],
+            90.0,
+            90.0,
+            &[1, 2],
+            &[1],
+            &[1, 2, 3],
+            3,
+            "Test_Ag_COH",
+        );
+        build(
+            "CH2.msi",
+            &[41],
+            90.0,
+            0.0,
+            &[2, 3],
+            &[1],
+            &[1, 2, 3],
+            2,
+            "Test_Ag_CH2",
+        );
+        build(
+            "COOH.msi",
+            &[41],
+            90.0,
+            0.0,
+            &[2, 3],
+            &[1],
+            &[1, 2, 3],
+            4,
+            "Test_Ag_COOH",
+        );
+        build(
+            "CH3.msi",
+            &[41],
+            0.0,
+            90.0,
+            &[1, 1],
+            &[1],
+            &[2, 3, 4],
+            2,
+            "Test_Ag_CH3",
+        )
+    }
+    #[test]
+    fn occo_cc() {
+        build(
+            "OCCO_cc.msi",
+            &[52, 53],
+            90.0,
+            0.0,
+            &[1, 2],
+            &[1, 2],
+            &[1, 2, 3],
+            3,
+            "Test_Ag_OCCO_CC_FR_c4",
+        );
+        build(
+            "OCCO_cc.msi",
+            &[53, 52],
+            90.0,
+            0.0,
+            &[1, 2],
+            &[1, 2],
+            &[1, 2, 3],
+            3,
+            "Test_Ag_OCCO_CC_c4_FR",
+        )
+    }
+    #[test]
+    fn ch3ch2() {
+        build(
+            "CH3CH2.msi",
+            &[41],
+            30.0,
+            0.0,
+            &[2, 3],
+            &[3],
+            &[2, 3, 5],
+            1,
+            "Test_Ag_CH3CH2",
+        )
     }
 }
