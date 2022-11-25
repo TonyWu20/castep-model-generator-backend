@@ -1,6 +1,6 @@
 use na::{Matrix3, Point3, RealField, Vector3};
 
-use crate::error::CollinearPoints;
+use castep_core::error::CollinearPoints;
 
 pub fn centroid_of_points(points: &[&Point3<f64>]) -> Point3<f64> {
     let num_points = points.len() as f64;

@@ -3,13 +3,11 @@ use std::{f64::consts::PI, fmt::Debug, marker::PhantomData};
 
 use na::{Point3, Translation3, Unit, UnitQuaternion, Vector3};
 
-use crate::{
+use crate::math_helper::{centroid_of_points, line_plane_intersect, plane_normal};
+use castep_core::{
     builder_typestate::{No, ToAssign, Yes},
     error::InvalidCoord,
-    lattice::LatticeModel,
-    math_helper::{centroid_of_points, line_plane_intersect, plane_normal},
-    model_type::ModelInfo,
-    Transformation,
+    LatticeModel, ModelInfo, Transformation,
 };
 
 pub trait BuilderState {}

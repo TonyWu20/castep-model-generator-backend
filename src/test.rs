@@ -1,17 +1,15 @@
 #[cfg(test)]
 mod test {
-    use std::fs::{read_to_string, write};
-
-    use crate::{
-        assemble::{AdsParamsBuilder, AdsorptionBuilder},
+    use crate::assemble::{AdsParamsBuilder, AdsorptionBuilder};
+    use castep_core::{
         builder_typestate::No,
-        lattice::LatticeModel,
-        model_type::{cell::CellModel, msi::MsiModel},
         param_writer::{
             castep_param::{BandStructureParam, GeomOptParam},
             seed_writer::SeedWriter,
         },
+        CellModel, LatticeModel, MsiModel,
     };
+    use std::fs::{read_to_string, write};
 
     #[test]
     fn test_conversion() {
