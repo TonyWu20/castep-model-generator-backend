@@ -397,6 +397,15 @@ where
             self.adsorbate_mut().rotate(&rotate_quatd);
         }
     }
+    fn check_coordinate(&self) -> Result<(), InvalidCoord> {
+        for atom in self.adsorbate().atoms() {
+            let xyz = atom.xyz();
+            if xyz.x.is_nan() || xyz.y.is_nan() || xyz.z.is_nan() {
+                return Err(InvalidCoord());
+            }
+        }
+        Ok(())
+    }
     fn ads_params(&self) -> &AdsParams {
         self.ads_params.as_ref().unwrap()
     }
@@ -502,17 +511,8 @@ impl<'a, T> AdsorptionBuilder<'a, T, ParamSet>
 where
     T: ModelInfo + std::fmt::Debug,
 {
-    fn check_coordinate(&self) -> Result<(), InvalidCoord> {
-        for atom in self.adsorbate().atoms() {
-            let xyz = atom.xyz();
-            if xyz.x.is_nan() || xyz.y.is_nan() || xyz.z.is_nan() {
-                return Err(InvalidCoord());
-            }
-        }
-        Ok(())
-    }
     /// "Roll" the plane. The purpose is to lay the specified plane around the stem to the proper angle.
-    fn roll_ads(&mut self, upper_atom_id: u32) -> Result<(), InvalidCoord> {
+    fn roll_ads(&mut self, upper_atom_id: u32) {
         let ads_atom_nums = self.adsorbate().atoms().len();
         match ads_atom_nums {
             1 => {}
@@ -529,11 +529,10 @@ where
         };
         // Flip up check instantly
         self.flip_up(upper_atom_id);
-        self.check_coordinate()
     }
     /// Determine the pitch angle. This determines the angle between the stem and target host sites.
     /// The logic for pitch do not differ on type of stem.
-    fn pitch_ads(&mut self) -> Result<(), InvalidCoord> {
+    fn pitch_ads(&mut self) {
         let stem_vector: Vector3<f64> = self.get_stem_vector().into();
         let coord_atom_xyz = self
             .adsorbate()
@@ -564,13 +563,10 @@ where
             let rot_axis = Unit::new_normalize(stem_vector.cross(&coord_dir_vec));
             let pitch_quatd = UnitQuaternion::from_axis_angle(&rot_axis, pitch_angle);
             self.adsorbate_mut().rotate(&pitch_quatd);
-            self.check_coordinate()
-        } else {
-            Ok(())
         }
     }
     /// Yaw
-    fn yaw_ads(&mut self) -> Result<(), InvalidCoord> {
+    fn yaw_ads(&mut self) {
         let stem_vector = self.get_stem_vector();
         match stem_vector {
             StemType::RealStem(stem) => {
@@ -596,7 +592,6 @@ where
                 }
             }
         }
-        self.check_coordinate()
     }
     pub fn init_ads(mut self, upper_atom_id: u32) -> AdsorptionBuilder<'a, T, Calibrated> {
         // Use Tate-Bryant convention order for rotation sequence. Unfortunately, nalgebra
@@ -612,12 +607,18 @@ where
         };
         self.adsorbate_mut().rotate(&rotate_quatd);
         self.move_to_origin();
-        self.roll_ads(upper_atom_id)
-            .unwrap_or_else(|e| panic!("{:?} {e} at func: roll_ads", self.adsorbate()));
-        self.pitch_ads()
-            .unwrap_or_else(|e| panic!("{:?} {e} at func: pitch_ads", self.adsorbate()));
-        self.yaw_ads()
-            .unwrap_or_else(|e| panic!("{:?} {e} at func: yaw_ads", self.adsorbate()));
+        self.roll_ads(upper_atom_id);
+        #[cfg(debug_assertions)]
+        self.check_coordinate()
+            .unwrap_or_else(|e| panic!("{:?} {e} at func: roll_ads", self.adsorbate().atoms()));
+        self.pitch_ads();
+        #[cfg(debug_assertions)]
+        self.check_coordinate()
+            .unwrap_or_else(|e| panic!("{:?} {e} at func: pitch_ads", self.adsorbate().atoms()));
+        self.yaw_ads();
+        #[cfg(debug_assertions)]
+        self.check_coordinate()
+            .unwrap_or_else(|e| panic!("{:?} {e} at func: yaw_ads", self.adsorbate().atoms()));
         let Self {
             host_lattice,
             adsorbate,
@@ -648,18 +649,14 @@ impl<'a, T: ModelInfo> AdsorptionBuilder<'a, T, Calibrated> {
         let coord_atom_point = ads.get_atom_by_id(coord_atom_id).unwrap().xyz();
         let vertical_proj_from_coord_atom = Vector3::new(0.0, 0.0, self.bond_length());
         // Create a stem_vector guaranteed to be pointing upwards
-        let stem_vector = {
-            let stem_atom_1 = ads.get_atom_by_id(self.stem_atom_ids()[0]).unwrap();
-            let stem_atom_2 = ads.get_atom_by_id(self.stem_atom_ids()[1]).unwrap();
-            if stem_atom_2.xyz().z > stem_atom_1.xyz().z {
-                stem_atom_2.xyz() - stem_atom_1.xyz()
-            } else {
-                stem_atom_1.xyz() - stem_atom_2.xyz()
-            }
+        let stem_vector: Vector3<f64> = self.get_stem_vector().into();
+        let stem_vector = if stem_vector.z < 0.0 {
+            stem_vector * -1.0
+        } else {
+            stem_vector
         };
         let angle = stem_vector.angle(&vertical_proj_from_coord_atom);
-        let actual_position = if angle - PI / 2.0 > f64::EPSILON {
-            println!("Not vertical");
+        let actual_position = if (angle - PI / 2.0).abs() > 0.0001 * f64::EPSILON {
             let unit_stem_vector = Unit::new_normalize(stem_vector);
             let translate_mat = Translation3::from(unit_stem_vector.scale(self.bond_length()));
             translate_mat.transform_point(&location)
@@ -669,6 +666,9 @@ impl<'a, T: ModelInfo> AdsorptionBuilder<'a, T, Calibrated> {
         // When the coord atom is on the stem
         let translate_mat = Translation3::from(actual_position - coord_atom_point);
         self.adsorbate_mut().translate(&translate_mat);
+        #[cfg(debug_assertions)]
+        self.check_coordinate()
+            .unwrap_or_else(|e| panic!("{e} at single_coord"));
     }
     /**
     When the adsorbate has multiple coordination atoms, translate
@@ -687,6 +687,9 @@ impl<'a, T: ModelInfo> AdsorptionBuilder<'a, T, Calibrated> {
             location.z += self.bond_length();
             let translate_mat = Translation3::from(location - coord_centroid);
             self.adsorbate_mut().translate(&translate_mat);
+            #[cfg(debug_assertions)]
+            self.check_coordinate()
+                .unwrap_or_else(|e| panic!("{e} at multiple_coord"));
         }
     }
     /// Place the adsorbate, depending on the number of coordination atoms.
