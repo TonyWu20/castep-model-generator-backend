@@ -600,7 +600,8 @@ where
             -1.0 * self.adsorbate_stem_coord_angle().to_radians().sin(),
         );
         // Only rotate when the two xz vectors are not collinear
-        if (stem_vector_xz.dot(&coord_dir_vec).abs() - 1.0).abs() > 0.001 * f64::EPSILON {
+        // Arbitrary float comparison precision is used here
+        if (stem_vector_xz.dot(&coord_dir_vec).abs() - 1.0).abs() > 0.001 {
             let pitch_angle = stem_vector_xz.angle(&coord_dir_vec);
             let rot_axis = Unit::new_normalize(stem_vector.cross(&coord_dir_vec));
             let pitch_quatd = UnitQuaternion::from_axis_angle(&rot_axis, pitch_angle);
@@ -615,7 +616,8 @@ where
                 let stem_xy_proj = Vector3::new(stem.x, stem.y, 0.0);
                 let dir_xy_proj = Vector3::new(self.ads_direction().x, self.ads_direction().y, 0.0);
                 let prod = stem_xy_proj.normalize().dot(&dir_xy_proj.normalize());
-                if (prod.abs() - 1.0).abs() > 0.001 * f64::EPSILON {
+                // Arbitrary float comparison precision is used here
+                if (prod.abs() - 1.0).abs() > 0.001 {
                     let angle = stem_xy_proj.angle(&dir_xy_proj);
                     let rot_axis = Unit::new_normalize(stem_xy_proj.cross(&dir_xy_proj));
                     let yaw_quatd = UnitQuaternion::from_axis_angle(&rot_axis, angle);
@@ -626,7 +628,8 @@ where
                 let virt_xy_proj = Vector3::new(virt.x, virt.y, 0.0);
                 let dir_xy_proj = Vector3::new(self.ads_direction().x, self.ads_direction().y, 0.0);
                 let prod = virt_xy_proj.normalize().dot(&dir_xy_proj.normalize());
-                if (prod.abs() - 1.0).abs() > 0.001 * f64::EPSILON {
+                // Arbitrary float comparison precision is used here
+                if (prod.abs() - 1.0).abs() > 0.001 {
                     let angle = Vector3::x_axis().xy().angle(&self.ads_direction().xy());
                     let yaw_quatd =
                         UnitQuaternion::from_axis_angle(&Unit::new_normalize(virt), angle);
@@ -692,13 +695,12 @@ impl<'a, T: ModelInfo> AdsorptionBuilder<'a, T, Calibrated> {
         let vertical_proj_from_coord_atom = Vector3::new(0.0, 0.0, self.bond_length());
         // Create a stem_vector guaranteed to be pointing upwards
         let stem_vector: Vector3<f64> = self.get_coord_stem_vector();
-        let angle = stem_vector.angle(&vertical_proj_from_coord_atom);
-        let actual_position = if angle.abs() > f64::EPSILON
-            && (angle - PI * 2.0).abs() > f64::EPSILON
-            && (angle - PI / 2.0).abs() > f64::EPSILON
-        {
-            #[cfg(debug_assertions)]
-            println!("Not vertical, {}", angle.abs());
+        let angle = stem_vector
+            .angle(&vertical_proj_from_coord_atom)
+            .to_degrees();
+        // Due to the difficulty in comparing float, the coordinating angle is limited to a reasonable range, other than
+        // telling if they are 0.0/2PI/1/2PI with tolerance.
+        let actual_position = if (angle > 1.0 && angle < 61.0) || (angle > 119.0 && angle < 179.0) {
             let unit_stem_vector = Unit::new_normalize(stem_vector);
             let translate_mat = Translation3::from(unit_stem_vector.scale(self.bond_length()));
             translate_mat.transform_point(&location)
