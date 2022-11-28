@@ -3,7 +3,9 @@ use std::{f64::consts::PI, fmt::Debug, marker::PhantomData};
 
 use na::{Point3, Translation3, Unit, UnitQuaternion, Vector3};
 
-use crate::math_helper::{centroid_of_points, line_plane_intersect, plane_normal};
+use crate::math_helper::{
+    centroid_of_points, line_plane_intersect, perpendicular_vec_through_a_point, plane_normal,
+};
 use castep_core::{
     builder_typestate::{No, ToAssign, Yes},
     error::InvalidCoord,
@@ -321,6 +323,35 @@ where
     T: ModelInfo,
     U: BuilderState + ParamSetState,
 {
+    fn get_coord_stem_vector(&self) -> Vector3<f64> {
+        if self.coord_atom_ids().len() == 1
+            && !self.stem_atom_ids().contains(&self.coord_atom_ids()[0])
+        {
+            let coord_xyz = self
+                .adsorbate()
+                .get_atom_by_id(self.coord_atom_ids()[0])
+                .unwrap()
+                .xyz();
+            let sa_xyz = self
+                .adsorbate()
+                .get_atom_by_id(self.stem_atom_ids()[0])
+                .unwrap()
+                .xyz();
+            let sb_xyz = self
+                .adsorbate()
+                .get_atom_by_id(self.stem_atom_ids()[1])
+                .unwrap()
+                .xyz();
+            perpendicular_vec_through_a_point(coord_xyz, sa_xyz, sb_xyz).unwrap()
+        } else {
+            let vector: Vector3<f64> = self.get_stem_vector().into();
+            if vector.z < 0.0 {
+                vector * -1.0
+            } else {
+                vector
+            }
+        }
+    }
     fn get_stem_vector(&self) -> StemType {
         if let Ok(stem_vec) = self
             .adsorbate()
@@ -649,14 +680,14 @@ impl<'a, T: ModelInfo> AdsorptionBuilder<'a, T, Calibrated> {
         let coord_atom_point = ads.get_atom_by_id(coord_atom_id).unwrap().xyz();
         let vertical_proj_from_coord_atom = Vector3::new(0.0, 0.0, self.bond_length());
         // Create a stem_vector guaranteed to be pointing upwards
-        let stem_vector: Vector3<f64> = self.get_stem_vector().into();
-        let stem_vector = if stem_vector.z < 0.0 {
-            stem_vector * -1.0
-        } else {
-            stem_vector
-        };
+        let stem_vector: Vector3<f64> = self.get_coord_stem_vector();
         let angle = stem_vector.angle(&vertical_proj_from_coord_atom);
-        let actual_position = if (angle - PI / 2.0).abs() > 0.0001 * f64::EPSILON {
+        let actual_position = if angle.abs() > f64::EPSILON
+            && (angle - PI * 2.0).abs() > f64::EPSILON
+            && (angle - PI / 2.0).abs() > f64::EPSILON
+        {
+            #[cfg(debug_assertions)]
+            println!("Not vertical, {}", angle.abs());
             let unit_stem_vector = Unit::new_normalize(stem_vector);
             let translate_mat = Translation3::from(unit_stem_vector.scale(self.bond_length()));
             translate_mat.transform_point(&location)

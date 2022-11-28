@@ -51,6 +51,43 @@ where
     )
 }
 
+/// Establish a vector through a known point and perpendicular to the given vector.
+pub fn perpendicular_vec_through_a_point<T>(
+    point: &Point3<T>,
+    line_point_1: &Point3<T>,
+    line_point_2: &Point3<T>,
+) -> Option<Vector3<T>>
+where
+    T: RealField + Copy,
+{
+    // Assume this is vector BA
+    let v_ba: Vector3<T> = point - line_point_1;
+    // Assume this is vector BC
+    let v_bc: Vector3<T> = line_point_2 - line_point_1;
+    // angle AB-BC
+    let alpha = v_ba.angle(&v_bc);
+    // Find if the line and the point are collinear
+    if (alpha - T::zero()).abs() < T::default_epsilon()
+        || (alpha - T::pi()).abs() < T::default_epsilon()
+    {
+        // If yes, the perpendicular vector does not exist.
+        return None;
+    }
+    // AB dot BC, is norm of BC times norm of BD (AD would be the perpendicular vector through A)
+    let prod_ab_bc = v_ba.dot(&v_bc);
+    // BC dot BC, gets the norm of BC
+    let prod_bc_bc = v_bc.dot(&v_bc);
+    // We have the ratio of BD/BC
+    let ratio = prod_ab_bc / prod_bc_bc;
+    let bd = v_bc.scale(ratio);
+    let d_xyz = Point3::<T>::new(
+        line_point_1.x + bd.x,
+        line_point_1.y + bd.y,
+        line_point_1.z + bd.z,
+    );
+    Some(d_xyz - point)
+}
+
 pub fn plane_normal<T>(
     point_1: &Point3<T>,
     point_2: &Point3<T>,
