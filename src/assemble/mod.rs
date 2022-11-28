@@ -323,6 +323,12 @@ where
     T: ModelInfo,
     U: BuilderState + ParamSetState,
 {
+    /// A special case needs to be handled correctly:
+    /// When the adsorbate is singly coordinated, but its coord atom is out of the stem_vector,
+    /// the coordination vector should be going through the coord atom and perpendicular to the stem
+    /// vector.
+    /// The vector must be guaranteed to be pointing positive z-direction, in order to calculate the upward
+    /// translation from the target location, seen in `single_coord` function.
     fn get_coord_stem_vector(&self) -> Vector3<f64> {
         if self.coord_atom_ids().len() == 1
             && !self.stem_atom_ids().contains(&self.coord_atom_ids()[0])
@@ -342,7 +348,12 @@ where
                 .get_atom_by_id(self.stem_atom_ids()[1])
                 .unwrap()
                 .xyz();
-            perpendicular_vec_through_a_point(coord_xyz, sa_xyz, sb_xyz).unwrap()
+            let vector = perpendicular_vec_through_a_point(coord_xyz, sa_xyz, sb_xyz).unwrap();
+            if vector.z < 0.0 {
+                vector * -1.0
+            } else {
+                vector
+            }
         } else {
             let vector: Vector3<f64> = self.get_stem_vector().into();
             if vector.z < 0.0 {
