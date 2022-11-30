@@ -7,5 +7,4 @@ pub mod math_helper;
 pub mod test;
 
 extern crate castep_model_core as castep_core;
-extern crate castep_periodic_table as cpt;
 extern crate nalgebra as na;
