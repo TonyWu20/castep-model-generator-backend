@@ -218,4 +218,8 @@ mod test {
             "Test_Ag_CH2C",
         );
     }
+    #[test]
+    fn hydrogen() {
+        build("H.msi", &[41], 0.0, 0.0, &[1], &[1], &[1], 1, "Test_Ag_H")
+    }
 }
