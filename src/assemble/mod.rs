@@ -145,32 +145,6 @@ where
             plane_atom_ids,
         }
     }
-    // pub fn with_coord_angle(
-    //     mut self,
-    //     coord_angle: f64,
-    // ) -> AdsParamsBuilder<AdsDirSet, CdAngleSet, Yes, PlaneAngleSet, BondLengthSet> {
-    //     self.coord_angle = Some(coord_angle);
-    //     let Self {
-    //         ads_direction,
-    //         coord_angle,
-    //         adsorbate_plane_angle,
-    //         bond_length,
-    //         ads_direction_set,
-    //         coord_angle_set: _,
-    //         adsorbate_plane_angle_set,
-    //         bond_length_set,
-    //     } = self;
-    //     AdsParamsBuilder {
-    //         ads_direction,
-    //         coord_angle,
-    //         adsorbate_plane_angle,
-    //         bond_length,
-    //         ads_direction_set,
-    //         coord_angle_set: PhantomData,
-    //         adsorbate_plane_angle_set,
-    //         bond_length_set,
-    //     }
-    // }
     pub fn with_plane_angle(
         mut self,
         plane_angle: f64,
@@ -332,6 +306,8 @@ where
     fn get_coord_stem_vector(&self) -> Vector3<f64> {
         if self.coord_atom_ids().len() == 1
             && !self.stem_atom_ids().contains(&self.coord_atom_ids()[0])
+            && self.adsorbate().atoms().len() > 2
+        // Only if the adsorbate has more than two atom.
         {
             let coord_xyz = self
                 .adsorbate()
@@ -364,7 +340,9 @@ where
         }
     }
     fn get_stem_vector(&self) -> StemType {
-        if let Ok(stem_vec) = self
+        if self.adsorbate().atoms().len() == 1 {
+            StemType::VirtualStem(*Vector3::z_axis())
+        } else if let Ok(stem_vec) = self
             .adsorbate()
             .get_vector_ab(self.stem_atom_ids()[0], self.stem_atom_ids()[1])
         {
@@ -405,16 +383,20 @@ where
         .unwrap()
     }
     fn move_to_origin(&mut self) {
-        let curr_stem_centroid = na::center(
-            self.adsorbate()
-                .get_atom_by_id(self.stem_atom_ids()[0])
-                .unwrap()
-                .xyz(),
-            self.adsorbate()
-                .get_atom_by_id(self.stem_atom_ids()[1])
-                .unwrap()
-                .xyz(),
-        );
+        let curr_stem_centroid: Point3<f64> = if self.adsorbate().atoms().len() > 1 {
+            na::center(
+                self.adsorbate()
+                    .get_atom_by_id(self.stem_atom_ids()[0])
+                    .unwrap()
+                    .xyz(),
+                self.adsorbate()
+                    .get_atom_by_id(self.stem_atom_ids()[1])
+                    .unwrap()
+                    .xyz(),
+            )
+        } else {
+            *self.adsorbate().get_atom_by_id(1).unwrap().xyz()
+        };
         let translate_mat = Translation3::from(Point3::origin() - curr_stem_centroid);
         self.adsorbate_mut().translate(&translate_mat);
     }
@@ -555,20 +537,12 @@ where
 {
     /// "Roll" the plane. The purpose is to lay the specified plane around the stem to the proper angle.
     fn roll_ads(&mut self, upper_atom_id: u32) {
-        let ads_atom_nums = self.adsorbate().atoms().len();
-        match ads_atom_nums {
-            1 => {}
-            2 => {}
-            _ => {
-                let plane_normal = self.get_plane_normal();
-                let plane_angle_rad = (90.0 - self.adsorbate_plane_angle()).to_radians();
-                let target_angle_vec =
-                    Vector3::new(0.0, plane_angle_rad.cos(), plane_angle_rad.sin());
-                let roll_quatd =
-                    UnitQuaternion::rotation_between(&plane_normal, &target_angle_vec).unwrap();
-                self.adsorbate_mut().rotate(&roll_quatd);
-            }
-        };
+        let plane_normal = self.get_plane_normal();
+        let plane_angle_rad = (90.0 - self.adsorbate_plane_angle()).to_radians();
+        let target_angle_vec = Vector3::new(0.0, plane_angle_rad.cos(), plane_angle_rad.sin());
+        let roll_quatd =
+            UnitQuaternion::rotation_between(&plane_normal, &target_angle_vec).unwrap();
+        self.adsorbate_mut().rotate(&roll_quatd);
         // Flip up check instantly
         self.flip_up(upper_atom_id);
     }
@@ -652,18 +626,42 @@ where
         };
         self.adsorbate_mut().rotate(&rotate_quatd);
         self.move_to_origin();
-        self.roll_ads(upper_atom_id);
-        #[cfg(debug_assertions)]
-        self.check_coordinate()
-            .unwrap_or_else(|e| panic!("{:?} {e} at func: roll_ads", self.adsorbate().atoms()));
-        self.pitch_ads();
-        #[cfg(debug_assertions)]
-        self.check_coordinate()
-            .unwrap_or_else(|e| panic!("{:?} {e} at func: pitch_ads", self.adsorbate().atoms()));
-        self.yaw_ads();
-        #[cfg(debug_assertions)]
-        self.check_coordinate()
-            .unwrap_or_else(|e| panic!("{:?} {e} at func: yaw_ads", self.adsorbate().atoms()));
+        let ads_atom_nums = self.adsorbate().atoms().len();
+        match ads_atom_nums {
+            1 => {} // No need to rotate a single atom
+            2 => {
+                // No plane to roll
+                // self.roll_ads(upper_atom_id)
+                self.pitch_ads();
+                #[cfg(debug_assertions)]
+                self.check_coordinate().unwrap_or_else(|e| {
+                    panic!("{:?} {e} at func: roll_ads", self.adsorbate().atoms())
+                });
+                self.yaw_ads();
+                #[cfg(debug_assertions)]
+                self.check_coordinate().unwrap_or_else(|e| {
+                    panic!("{:?} {e} at func: roll_ads", self.adsorbate().atoms())
+                });
+            }
+            _ => {
+                // Perform all actions
+                self.roll_ads(upper_atom_id);
+                #[cfg(debug_assertions)]
+                self.check_coordinate().unwrap_or_else(|e| {
+                    panic!("{:?} {e} at func: roll_ads", self.adsorbate().atoms())
+                });
+                self.pitch_ads();
+                #[cfg(debug_assertions)]
+                self.check_coordinate().unwrap_or_else(|e| {
+                    panic!("{:?} {e} at func: roll_ads", self.adsorbate().atoms())
+                });
+                self.yaw_ads();
+                #[cfg(debug_assertions)]
+                self.check_coordinate().unwrap_or_else(|e| {
+                    panic!("{:?} {e} at func: roll_ads", self.adsorbate().atoms())
+                });
+            }
+        }
         let Self {
             host_lattice,
             adsorbate,
