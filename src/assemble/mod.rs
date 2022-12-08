@@ -115,9 +115,9 @@ where
     }
     pub fn with_ads_direction(
         mut self,
-        ads_direction: &Vector3<f64>,
+        ads_direction: Option<Vector3<f64>>,
     ) -> AdsParamsBuilder<'a, Yes, CdAngleSet, PlaneAngleSet, BondLengthSet> {
-        self.ads_direction = Some(ads_direction.to_owned());
+        self.ads_direction = ads_direction;
         let Self {
             ads_direction,
             adsorbate_plane_angle,

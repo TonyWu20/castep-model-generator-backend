@@ -9,6 +9,7 @@ mod test {
         },
         CellModel, LatticeModel, MsiModel,
     };
+    use nalgebra::Vector3;
     use std::fs::{read_to_string, write};
 
     #[test]
@@ -34,10 +35,12 @@ mod test {
         let lat = LatticeModel::<MsiModel>::try_from(test_lat.as_str()).unwrap();
         let test_ad = read_to_string(ads_name).unwrap();
         let ads = LatticeModel::<MsiModel>::try_from(test_ad.as_str()).unwrap();
-        let carbon_chain_vector = if target_sites.len() == 1 {
-            lat.get_vector_ab(41_u32, 42_u32).unwrap()
+        let ads_direction: Option<Vector3<f64>> = if ads.atoms().len() == 1 {
+            None
+        } else if target_sites.len() == 1 {
+            Some(lat.get_vector_ab(41_u32, 42_u32).unwrap())
         } else {
-            lat.get_vector_ab(target_sites[0], target_sites[1]).unwrap()
+            Some(lat.get_vector_ab(target_sites[0], target_sites[1]).unwrap())
         };
         let export_loc_str = "test";
         let potential_loc_str = "../C-GDY-SAC/Potentials";
@@ -48,7 +51,7 @@ mod test {
             .with_location_at_sites(target_sites)
             .with_ads_params(
                 AdsParamsBuilder::<No, No, No, No>::new()
-                    .with_ads_direction(&carbon_chain_vector)
+                    .with_ads_direction(ads_direction)
                     .with_plane_angle(plane_angle)
                     .with_bond_length(1.4)
                     // .with_stem_coord_angle(45.0) // OCC
