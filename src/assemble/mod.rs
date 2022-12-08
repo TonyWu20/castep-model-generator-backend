@@ -62,13 +62,13 @@ pub struct AdsorptionBuilder<'a, T: ModelInfo, U: BuilderState> {
 
 #[derive(Debug, Default)]
 pub struct AdsParams<'a> {
-    ads_direction: Vector3<f64>,
-    adsorbate_plane_angle: f64,
+    ads_direction: Option<Vector3<f64>>,
+    adsorbate_plane_angle: Option<f64>,
     stem_coord_angle: f64,
     bond_length: f64,
     coord_atom_ids: &'a [u32],
-    stem_atom_ids: &'a [u32],
-    plane_atom_ids: &'a [u32],
+    stem_atom_ids: Option<&'a [u32; 2]>,
+    plane_atom_ids: Option<&'a [u32; 3]>,
 }
 
 #[derive(Debug, Default)]
@@ -83,8 +83,8 @@ where
     stem_coord_angle: Option<f64>,
     bond_length: Option<f64>,
     coord_atom_ids: Option<&'a [u32]>,
-    stem_atom_ids: Option<&'a [u32]>,
-    plane_atom_ids: Option<&'a [u32]>,
+    stem_atom_ids: Option<&'a [u32; 2]>,
+    plane_atom_ids: Option<&'a [u32; 3]>,
     ads_direction_set: PhantomData<AdsDirSet>,
     coord_angle_set: PhantomData<CdAngleSet>,
     adsorbate_plane_angle_set: PhantomData<PlaneAngleSet>,
@@ -147,9 +147,9 @@ where
     }
     pub fn with_plane_angle(
         mut self,
-        plane_angle: f64,
+        plane_angle: Option<f64>,
     ) -> AdsParamsBuilder<'a, AdsDirSet, CdAngleSet, Yes, BondLengthSet> {
-        self.adsorbate_plane_angle = Some(plane_angle);
+        self.adsorbate_plane_angle = plane_angle;
         let Self {
             ads_direction,
             adsorbate_plane_angle,
@@ -250,16 +250,16 @@ where
     }
     pub fn with_stem_atom_ids(
         mut self,
-        stem_atom_ids: &'a [u32],
+        stem_atom_ids: Option<&'a [u32; 2]>,
     ) -> AdsParamsBuilder<'a, AdsDirSet, CdAngleSet, PlaneAngleSet, BondLengthSet> {
-        self.stem_atom_ids = Some(stem_atom_ids);
+        self.stem_atom_ids = stem_atom_ids;
         self
     }
     pub fn with_plane_atom_ids(
         mut self,
-        plane_atom_ids: &'a [u32],
+        plane_atom_ids: Option<&'a [u32; 3]>,
     ) -> AdsParamsBuilder<'a, AdsDirSet, CdAngleSet, PlaneAngleSet, BondLengthSet> {
-        self.plane_atom_ids = Some(plane_atom_ids);
+        self.plane_atom_ids = plane_atom_ids;
         self
     }
 }
@@ -267,17 +267,18 @@ where
 impl<'a> AdsParamsBuilder<'a, Yes, Yes, Yes, Yes> {
     pub fn finish(self) -> AdsParams<'a> {
         AdsParams {
-            ads_direction: self.ads_direction.unwrap(),
-            adsorbate_plane_angle: self.adsorbate_plane_angle.unwrap(),
+            ads_direction: self.ads_direction,
+            adsorbate_plane_angle: self.adsorbate_plane_angle,
             stem_coord_angle: self.stem_coord_angle.unwrap(),
             bond_length: self.bond_length.unwrap(),
             coord_atom_ids: self.coord_atom_ids.unwrap(),
-            stem_atom_ids: self.stem_atom_ids.unwrap(),
-            plane_atom_ids: self.plane_atom_ids.unwrap(),
+            stem_atom_ids: self.stem_atom_ids,
+            plane_atom_ids: self.plane_atom_ids,
         }
     }
 }
 
+#[derive(Clone)]
 enum StemType {
     RealStem(Vector3<f64>),
     VirtualStem(Vector3<f64>),
@@ -304,93 +305,118 @@ where
     /// The vector must be guaranteed to be pointing positive z-direction, in order to calculate the upward
     /// translation from the target location, seen in `single_coord` function.
     fn get_coord_stem_vector(&self) -> Vector3<f64> {
-        if self.coord_atom_ids().len() == 1
-            && !self.stem_atom_ids().contains(&self.coord_atom_ids()[0])
-            && self.adsorbate().atoms().len() > 2
-        // Only if the adsorbate has more than two atom.
-        {
-            let coord_xyz = self
-                .adsorbate()
-                .get_atom_by_id(self.coord_atom_ids()[0])
-                .unwrap()
-                .xyz();
-            let sa_xyz = self
-                .adsorbate()
-                .get_atom_by_id(self.stem_atom_ids()[0])
-                .unwrap()
-                .xyz();
-            let sb_xyz = self
-                .adsorbate()
-                .get_atom_by_id(self.stem_atom_ids()[1])
-                .unwrap()
-                .xyz();
-            let vector = perpendicular_vec_through_a_point(coord_xyz, sa_xyz, sb_xyz).unwrap();
-            if vector.z < 0.0 {
-                vector * -1.0
-            } else {
-                vector
+        match self.stem_atom_ids() {
+            Some(stem_atom_ids) => {
+                if self.coord_atom_ids().len() == 1
+                    && !stem_atom_ids.contains(&self.coord_atom_ids()[0])
+                {
+                    let coord_xyz = self
+                        .adsorbate()
+                        .get_atom_by_id(self.coord_atom_ids()[0])
+                        .unwrap()
+                        .xyz();
+                    let sa_xyz = self
+                        .adsorbate()
+                        .get_atom_by_id(stem_atom_ids[0])
+                        .unwrap()
+                        .xyz();
+                    let sb_xyz = self
+                        .adsorbate()
+                        .get_atom_by_id(stem_atom_ids[1])
+                        .unwrap()
+                        .xyz();
+                    let vector =
+                        perpendicular_vec_through_a_point(coord_xyz, sa_xyz, sb_xyz).unwrap();
+                    if vector.z < 0.0 {
+                        vector * -1.0
+                    } else {
+                        vector
+                    }
+                } else {
+                    let vector: Vector3<f64> = self.get_stem_vector().into();
+                    if vector.z < 0.0 {
+                        vector * -1.0
+                    } else {
+                        vector
+                    }
+                }
             }
-        } else {
-            let vector: Vector3<f64> = self.get_stem_vector().into();
-            if vector.z < 0.0 {
-                vector * -1.0
-            } else {
-                vector
+            None => {
+                let vector: Vector3<f64> = self.get_stem_vector().into();
+                if vector.z < 0.0 {
+                    vector * -1.0
+                } else {
+                    vector
+                }
             }
         }
     }
     fn get_stem_vector(&self) -> StemType {
-        if self.adsorbate().atoms().len() == 1 {
+        if let Some(stem_atom_ids) = self.stem_atom_ids() {
+            // Run into a virtual stem vector is needed
+            if stem_atom_ids[0] == stem_atom_ids[1] {
+                let stem_atom_xyz = self
+                    .adsorbate()
+                    .get_atom_by_id(stem_atom_ids[0])
+                    .unwrap()
+                    .xyz();
+                let plane_atom_xyz = self
+                    .adsorbate()
+                    .get_atom_by_id(self.plane_atom_ids().unwrap()[0]) // The existence of a plane is guaranteed
+                    .unwrap()
+                    .xyz();
+                // At this case, a plane is guaranteed
+                let plane_normal = self.get_plane_normal().unwrap();
+                let stem_intersects_plane = line_plane_intersect(
+                    stem_atom_xyz,
+                    plane_atom_xyz,
+                    &plane_normal,
+                    &plane_normal,
+                );
+                StemType::VirtualStem(stem_intersects_plane - stem_atom_xyz)
+            }
+            // Normal case
+            else {
+                StemType::RealStem(
+                    self.adsorbate()
+                        .get_vector_ab(stem_atom_ids[0], stem_atom_ids[1])
+                        .unwrap(),
+                )
+            }
+        }
+        // Single atom, no stem
+        else {
             StemType::VirtualStem(*Vector3::z_axis())
-        } else if let Ok(stem_vec) = self
-            .adsorbate()
-            .get_vector_ab(self.stem_atom_ids()[0], self.stem_atom_ids()[1])
-        {
-            StemType::RealStem(stem_vec)
-        } else {
-            let stem_atom_xyz = self
-                .adsorbate()
-                .get_atom_by_id(self.stem_atom_ids()[0])
-                .unwrap()
-                .xyz();
-            let plane_atom_xyz = self
-                .adsorbate()
-                .get_atom_by_id(self.plane_atom_ids()[0])
-                .unwrap()
-                .xyz();
-            let plane_normal = self.get_plane_normal();
-            let stem_intersects_plane =
-                line_plane_intersect(stem_atom_xyz, plane_atom_xyz, &plane_normal, &plane_normal);
-            StemType::VirtualStem(stem_intersects_plane - stem_atom_xyz)
         }
     }
-    fn get_plane_normal(&self) -> Vector3<f64> {
-        let plane_atoms = self.plane_atom_ids();
-        plane_normal(
-            self.adsorbate()
-                .get_atom_by_id(plane_atoms[0])
-                .unwrap()
-                .xyz(),
-            self.adsorbate()
-                .get_atom_by_id(plane_atoms[1])
-                .unwrap()
-                .xyz(),
-            self.adsorbate()
-                .get_atom_by_id(plane_atoms[2])
-                .unwrap()
-                .xyz(),
-        )
-        .unwrap()
-    }
-    fn move_to_origin(&mut self) {
-        let curr_stem_centroid: Point3<f64> = if self.adsorbate().atoms().len() > 1 {
-            na::center(
+    fn get_plane_normal(&self) -> Option<Vector3<f64>> {
+        self.plane_atom_ids().map(|plane_atoms| {
+            plane_normal(
                 self.adsorbate()
-                    .get_atom_by_id(self.stem_atom_ids()[0])
+                    .get_atom_by_id(plane_atoms[0])
                     .unwrap()
                     .xyz(),
                 self.adsorbate()
-                    .get_atom_by_id(self.stem_atom_ids()[1])
+                    .get_atom_by_id(plane_atoms[1])
+                    .unwrap()
+                    .xyz(),
+                self.adsorbate()
+                    .get_atom_by_id(plane_atoms[2])
+                    .unwrap()
+                    .xyz(),
+            )
+            .unwrap()
+        })
+    }
+    fn move_to_origin(&mut self) {
+        let curr_stem_centroid: Point3<f64> = if let Some(stem_atom_ids) = self.stem_atom_ids() {
+            na::center(
+                self.adsorbate()
+                    .get_atom_by_id(stem_atom_ids[0])
+                    .unwrap()
+                    .xyz(),
+                self.adsorbate()
+                    .get_atom_by_id(stem_atom_ids[1])
                     .unwrap()
                     .xyz(),
             )
@@ -433,7 +459,7 @@ where
     fn ads_params(&self) -> &AdsParams {
         self.ads_params.as_ref().unwrap()
     }
-    fn adsorbate_plane_angle(&self) -> f64 {
+    fn adsorbate_plane_angle(&self) -> Option<f64> {
         self.ads_params().adsorbate_plane_angle
     }
     fn adsorbate_stem_coord_angle(&self) -> f64 {
@@ -448,16 +474,16 @@ where
     fn adsorbate_mut(&mut self) -> &mut LatticeModel<T> {
         self.adsorbate.as_mut().unwrap()
     }
-    fn ads_direction(&self) -> &Vector3<f64> {
-        &self.ads_params().ads_direction
+    fn ads_direction(&self) -> Option<&Vector3<f64>> {
+        self.ads_params().ads_direction.as_ref()
     }
-    fn stem_atom_ids(&self) -> &[u32] {
+    fn stem_atom_ids(&self) -> Option<&[u32; 2]> {
         self.ads_params().stem_atom_ids
     }
     fn coord_atom_ids(&self) -> &[u32] {
         self.ads_params().coord_atom_ids
     }
-    fn plane_atom_ids(&self) -> &[u32] {
+    fn plane_atom_ids(&self) -> Option<&[u32; 3]> {
         self.ads_params().plane_atom_ids
     }
     fn bond_length(&self) -> f64 {
@@ -537,12 +563,14 @@ where
 {
     /// "Roll" the plane. The purpose is to lay the specified plane around the stem to the proper angle.
     fn roll_ads(&mut self, upper_atom_id: u32) {
-        let plane_normal = self.get_plane_normal();
-        let plane_angle_rad = (90.0 - self.adsorbate_plane_angle()).to_radians();
-        let target_angle_vec = Vector3::new(0.0, plane_angle_rad.cos(), plane_angle_rad.sin());
-        let roll_quatd =
-            UnitQuaternion::rotation_between(&plane_normal, &target_angle_vec).unwrap();
-        self.adsorbate_mut().rotate(&roll_quatd);
+        if let Some(plane_angle) = self.adsorbate_plane_angle() {
+            let plane_normal = self.get_plane_normal().unwrap();
+            let plane_angle_rad = (90.0 - plane_angle).to_radians();
+            let target_angle_vec = Vector3::new(0.0, plane_angle_rad.cos(), plane_angle_rad.sin());
+            let roll_quatd =
+                UnitQuaternion::rotation_between(&plane_normal, &target_angle_vec).unwrap();
+            self.adsorbate_mut().rotate(&roll_quatd);
+        }
         // Flip up check instantly
         self.flip_up(upper_atom_id);
     }
@@ -584,30 +612,28 @@ where
     }
     /// Yaw
     fn yaw_ads(&mut self) {
-        let stem_vector = self.get_stem_vector();
-        match stem_vector {
-            StemType::RealStem(stem) => {
-                let stem_xy_proj = Vector3::new(stem.x, stem.y, 0.0);
-                let dir_xy_proj = Vector3::new(self.ads_direction().x, self.ads_direction().y, 0.0);
-                let prod = stem_xy_proj.normalize().dot(&dir_xy_proj.normalize());
-                // Arbitrary float comparison precision is used here
-                if (prod.abs() - 1.0).abs() > 0.001 {
-                    let angle = stem_xy_proj.angle(&dir_xy_proj);
-                    let rot_axis = Unit::new_normalize(stem_xy_proj.cross(&dir_xy_proj));
-                    let yaw_quatd = UnitQuaternion::from_axis_angle(&rot_axis, angle);
-                    self.adsorbate_mut().rotate(&yaw_quatd);
-                }
-            }
-            StemType::VirtualStem(virt) => {
-                let virt_xy_proj = Vector3::new(virt.x, virt.y, 0.0);
-                let dir_xy_proj = Vector3::new(self.ads_direction().x, self.ads_direction().y, 0.0);
-                let prod = virt_xy_proj.normalize().dot(&dir_xy_proj.normalize());
-                // Arbitrary float comparison precision is used here
-                if (prod.abs() - 1.0).abs() > 0.001 {
-                    let angle = Vector3::x_axis().xy().angle(&self.ads_direction().xy());
-                    let yaw_quatd =
-                        UnitQuaternion::from_axis_angle(&Unit::new_normalize(virt), angle);
-                    self.adsorbate_mut().rotate(&yaw_quatd);
+        // If no direction is given, skip
+        if let Some(ads_direction) = self.ads_direction() {
+            let stem_vector = self.get_stem_vector();
+            let vector: Vector3<f64> = stem_vector.clone().into();
+            let stem_xy_proj = Vector3::new(vector.x, vector.y, 0.0);
+            let dir_xy_proj = Vector3::new(ads_direction.x, ads_direction.y, 0.0);
+            let prod = stem_xy_proj.normalize().dot(&dir_xy_proj.normalize());
+            // Arbitrary float comparison precision is used here
+            if (prod.abs() - 1.0).abs() > 0.001 {
+                match stem_vector {
+                    StemType::RealStem(_) => {
+                        let angle = stem_xy_proj.angle(&dir_xy_proj);
+                        let rot_axis = Unit::new_normalize(stem_xy_proj.cross(&dir_xy_proj));
+                        let yaw_quatd = UnitQuaternion::from_axis_angle(&rot_axis, angle);
+                        self.adsorbate_mut().rotate(&yaw_quatd);
+                    }
+                    StemType::VirtualStem(virt) => {
+                        let angle = Vector3::x_axis().xy().angle(&ads_direction.xy());
+                        let yaw_quatd =
+                            UnitQuaternion::from_axis_angle(&Unit::new_normalize(virt), angle);
+                        self.adsorbate_mut().rotate(&yaw_quatd);
+                    }
                 }
             }
         }
@@ -629,22 +655,10 @@ where
         let ads_atom_nums = self.adsorbate().atoms().len();
         match ads_atom_nums {
             1 => {} // No need to rotate a single atom
-            2 => {
-                // No plane to roll
-                // self.roll_ads(upper_atom_id)
-                self.pitch_ads();
-                #[cfg(debug_assertions)]
-                self.check_coordinate().unwrap_or_else(|e| {
-                    panic!("{:?} {e} at func: roll_ads", self.adsorbate().atoms())
-                });
-                self.yaw_ads();
-                #[cfg(debug_assertions)]
-                self.check_coordinate().unwrap_or_else(|e| {
-                    panic!("{:?} {e} at func: roll_ads", self.adsorbate().atoms())
-                });
-            }
             _ => {
                 // Perform all actions
+                // If atom num is 2, plane angle is none,
+                // the `roll_ads` will only perform flip up check
                 self.roll_ads(upper_atom_id);
                 #[cfg(debug_assertions)]
                 self.check_coordinate().unwrap_or_else(|e| {
