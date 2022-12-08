@@ -17,11 +17,11 @@ pub trait Adsorbate {}
 pub struct AdsInfo {
     name: String,
     #[serde(rename = "coordAtomIds")]
-    coord_atom_ids: Vec<u32>,
+    coord_atom_ids: Vec<u32>, // Unknown size
     #[serde(rename = "stemAtomIds")]
-    stem_atom_ids: Vec<u32>,
+    stem_atom_ids: Option<[u32; 2]>, // Only can be an array with a size of 2
     #[serde(rename = "planeAtomIds")]
-    plane_atom_ids: Option<Vec<u32>>,
+    plane_atom_ids: Option<[u32; 3]>, // Only can be an array with a size of 3
     plane_angle: Option<f64>,
     stem_angle_at_coord: Option<f64>,
     #[serde(rename = "bSym")]
@@ -43,7 +43,7 @@ impl AdsInfo {
         self.coord_atom_ids.as_ref()
     }
 
-    pub fn stem_atom_ids(&self) -> &[u32] {
+    pub fn stem_atom_ids(&self) -> Option<&[u32; 2]> {
         self.stem_atom_ids.as_ref()
     }
 
@@ -71,7 +71,7 @@ impl AdsInfo {
         self.stem_angle_at_coord
     }
 
-    pub fn plane_atom_ids(&self) -> Option<&Vec<u32>> {
+    pub fn plane_atom_ids(&self) -> Option<&[u32; 3]> {
         self.plane_atom_ids.as_ref()
     }
 }
