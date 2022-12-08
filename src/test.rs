@@ -22,11 +22,11 @@ mod test {
     fn build(
         ads_name: &str,
         target_sites: &[u32], // target_sites, plane_angle, coord_angle, stem_atom_ids, coord_atom_ids, plane_atom_ids, stem_name
-        plane_angle: f64,
+        plane_angle: Option<f64>,
         coord_angle: f64,
-        stem_atom_ids: &[u32],
+        stem_atom_ids: Option<&[u32; 2]>,
         coord_atom_ids: &[u32],
-        plane_atom_ids: &[u32],
+        plane_atom_ids: Option<&[u32; 3]>,
         upper_atom_id: u32,
         seed_name: &str,
     ) {
@@ -79,66 +79,66 @@ mod test {
         build(
             "OCC.msi",
             &[41],
-            0.0,
+            Some(0.0),
             50.0,
-            &[1, 2],
+            Some(&[1, 2]),
             &[1],
-            &[1, 2, 3],
+            Some(&[1, 2, 3]),
             3,
             "Test_Ag_OCC",
         );
         build(
             "CO.msi",
             &[41],
-            0.0,
+            None,
             90.0,
-            &[1, 2],
+            Some(&[1, 2]),
             &[1],
-            &[1, 2, 2],
+            None,
             2,
             "Test_Ag_CO",
         );
         build(
             "COH.msi",
             &[41],
+            Some(90.0),
             90.0,
-            90.0,
-            &[1, 2],
+            Some(&[1, 2]),
             &[1],
-            &[1, 2, 3],
+            Some(&[1, 2, 3]),
             3,
             "Test_Ag_COH",
         );
         build(
             "CH2.msi",
             &[41],
-            90.0,
+            Some(90.0),
             0.0,
-            &[2, 3],
+            Some(&[2, 3]),
             &[1],
-            &[1, 2, 3],
+            Some(&[1, 2, 3]),
             2,
             "Test_Ag_CH2",
         );
         build(
             "COOH.msi",
             &[41],
-            90.0,
+            Some(90.0),
             0.0,
-            &[2, 3],
+            Some(&[2, 3]),
             &[1],
-            &[1, 2, 3],
+            Some(&[1, 2, 3]),
             4,
             "Test_Ag_COOH",
         );
         build(
             "CH3.msi",
             &[41],
-            0.0,
+            Some(0.0),
             90.0,
-            &[1, 1],
+            Some(&[1, 1]),
             &[1],
-            &[2, 3, 4],
+            Some(&[2, 3, 4]),
             2,
             "Test_Ag_CH3",
         )
@@ -148,22 +148,22 @@ mod test {
         build(
             "OCCO_cc.msi",
             &[52, 53],
-            90.0,
+            Some(90.0),
             0.0,
+            Some(&[1, 2]),
             &[1, 2],
-            &[1, 2],
-            &[1, 2, 3],
+            Some(&[1, 2, 3]),
             3,
             "Test_Ag_OCCO_CC_FR_c4",
         );
         build(
             "OCCO_cc.msi",
             &[53, 52],
-            90.0,
+            Some(90.0),
             0.0,
+            Some(&[1, 2]),
             &[1, 2],
-            &[1, 2],
-            &[1, 2, 3],
+            Some(&[1, 2, 3]),
             3,
             "Test_Ag_OCCO_CC_c4_FR",
         )
@@ -173,22 +173,22 @@ mod test {
         build(
             "CH3CH2.msi",
             &[41],
-            150.0,
+            Some(150.0),
             0.0,
-            &[3, 2],
+            Some(&[3, 2]),
             &[3],
-            &[2, 3, 5],
+            Some(&[2, 3, 5]),
             1,
             "Test_Ag_CH3CH2",
         );
         build(
             "CH3CH.msi",
             &[41],
-            40.0,
+            Some(40.0),
             0.0,
-            &[2, 1],
+            Some(&[2, 1]),
             &[2],
-            &[1, 2, 6],
+            Some(&[1, 2, 6]),
             6,
             "Test_Ag_CH3CH",
         )
@@ -198,28 +198,28 @@ mod test {
         build(
             "CH2CH.msi",
             &[41],
+            Some(0.0),
             0.0,
-            0.0,
-            &[2, 1],
+            Some(&[2, 1]),
             &[2],
-            &[1, 3, 4],
+            Some(&[1, 3, 4]),
             4,
             "Test_Ag_CH2CH",
         );
         build(
             "CH2C.msi",
             &[41],
+            Some(0.0),
             0.0,
-            0.0,
-            &[2, 1],
+            Some(&[2, 1]),
             &[2],
-            &[1, 3, 4],
+            Some(&[1, 3, 4]),
             4,
             "Test_Ag_CH2C",
         );
     }
     #[test]
     fn hydrogen() {
-        build("H.msi", &[41], 0.0, 0.0, &[1], &[1], &[1], 1, "Test_Ag_H")
+        build("H.msi", &[41], None, 0.0, None, &[1], None, 1, "Test_Ag_H")
     }
 }
