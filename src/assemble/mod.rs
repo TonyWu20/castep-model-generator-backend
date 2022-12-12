@@ -64,7 +64,7 @@ pub struct AdsorptionBuilder<'a, T: ModelInfo, U: BuilderState> {
 pub struct AdsParams<'a> {
     ads_direction: Option<Vector3<f64>>,
     adsorbate_plane_angle: Option<f64>,
-    stem_coord_angle: f64,
+    stem_coord_angle: Option<f64>,
     bond_length: f64,
     coord_atom_ids: &'a [u32],
     stem_atom_ids: Option<&'a [u32; 2]>,
@@ -75,6 +75,7 @@ pub struct AdsParams<'a> {
 pub struct AdsParamsBuilder<'a, AdsDirSet, CdAngleSet, PlaneAngleSet, BondLengthSet>
 where
     AdsDirSet: ToAssign,
+    CdAngleSet: ToAssign,
     PlaneAngleSet: ToAssign,
     BondLengthSet: ToAssign,
 {
@@ -95,6 +96,7 @@ impl<'a, AdsDirSet, CdAngleSet, PlaneAngleSet, BondLengthSet>
     AdsParamsBuilder<'a, AdsDirSet, CdAngleSet, PlaneAngleSet, BondLengthSet>
 where
     AdsDirSet: ToAssign,
+    CdAngleSet: ToAssign,
     PlaneAngleSet: ToAssign,
     BondLengthSet: ToAssign,
 {
@@ -211,9 +213,9 @@ where
     }
     pub fn with_stem_coord_angle(
         mut self,
-        coord_angle: f64,
+        coord_angle: Option<f64>,
     ) -> AdsParamsBuilder<'a, AdsDirSet, Yes, PlaneAngleSet, BondLengthSet> {
-        self.stem_coord_angle = Some(coord_angle);
+        self.stem_coord_angle = coord_angle;
         let Self {
             ads_direction,
             adsorbate_plane_angle,
@@ -269,7 +271,7 @@ impl<'a> AdsParamsBuilder<'a, Yes, Yes, Yes, Yes> {
         AdsParams {
             ads_direction: self.ads_direction,
             adsorbate_plane_angle: self.adsorbate_plane_angle,
-            stem_coord_angle: self.stem_coord_angle.unwrap(),
+            stem_coord_angle: self.stem_coord_angle,
             bond_length: self.bond_length.unwrap(),
             coord_atom_ids: self.coord_atom_ids.unwrap(),
             stem_atom_ids: self.stem_atom_ids,
@@ -462,7 +464,7 @@ where
     fn adsorbate_plane_angle(&self) -> Option<f64> {
         self.ads_params().adsorbate_plane_angle
     }
-    fn adsorbate_stem_coord_angle(&self) -> f64 {
+    fn adsorbate_stem_coord_angle(&self) -> Option<f64> {
         self.ads_params().stem_coord_angle
     }
     fn adsorbate(&self) -> &LatticeModel<T> {
@@ -597,9 +599,17 @@ where
         let stem_vector_xz = Vector3::new(stem_vector.x, 0.0, stem_vector.z).normalize(); //|
         let coord_dir_vec = Vector3::new(
             // Apply the direction sign here <----------------------------------------------|
-            sign * self.adsorbate_stem_coord_angle().to_radians().cos(),
+            sign * self
+                .adsorbate_stem_coord_angle()
+                .unwrap()
+                .to_radians()
+                .cos(),
             0.0,
-            -1.0 * self.adsorbate_stem_coord_angle().to_radians().sin(),
+            -1.0 * self
+                .adsorbate_stem_coord_angle()
+                .unwrap()
+                .to_radians()
+                .sin(),
         );
         // Only rotate when the two xz vectors are not collinear
         // Arbitrary float comparison precision is used here
