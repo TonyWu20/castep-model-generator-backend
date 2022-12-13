@@ -76,4 +76,12 @@ impl AdsInfo {
     pub fn plane_atom_ids(&self) -> Option<&[u32; 3]> {
         self.plane_atom_ids.as_ref()
     }
+
+    pub fn set_plane_angle(&mut self, plane_angle: Option<f64>) {
+        self.plane_angle = plane_angle;
+    }
+
+    pub fn bond_length(&self) -> Option<f64> {
+        self.bond_length
+    }
 }
