@@ -24,6 +24,8 @@ pub struct AdsInfo {
     plane_atom_ids: Option<[u32; 3]>, // Only can be an array with a size of 3
     plane_angle: Option<f64>,
     stem_angle_at_coord: Option<f64>,
+    #[serde(rename = "bondLength")]
+    bond_length: Option<f64>,
     #[serde(rename = "bSym")]
     symmetric: bool,
     #[serde(rename = "upperAtomId")]
