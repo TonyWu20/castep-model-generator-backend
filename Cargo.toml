@@ -22,4 +22,4 @@ keywords = [
 nalgebra = {version="0.*", features=["debug", "compare", "rand","macros", "alloc", "arbitrary"]}
 serde_yaml = "0.8.*"
 serde = { version = "1.*", features = ["derive"] }
-castep-model-core = "0.1.*"
+castep-model-core = {path = "../castep-model-core"}
