@@ -1,7 +1,7 @@
 /// Assemble adsorbate and lattice.
 use std::{f64::consts::PI, fmt::Debug, marker::PhantomData};
 
-use castep_model_core::atom::visitor::{get_multiple_xyz_by_id, get_xyz_by_id};
+use castep_model_core::atom::visitor::{get_multiple_xyz_by_id, get_xyz_by_id, VisitCollection};
 use na::{Point3, Translation3, Unit, UnitQuaternion, Vector3};
 
 use crate::math_helper::{
