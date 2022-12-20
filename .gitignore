@@ -18,3 +18,5 @@ Cargo.lock
 test
 *.msi
 *.cell
+resources/*.yaml
+Test_*_opt
