@@ -4,7 +4,7 @@ description = "A rust-written backend lib for edit and generation of lattice 3D-
 readme = "README.md"
 homepage = "https://github.com/TonyWu20/castep-model-generator-backend"
 repository = "https://github.com/TonyWu20/castep-model-generator-backend"
-version = "2.0.14"
+version = "2.1.0"
 edition = "2021"
 license = "MIT"
 keywords = [
@@ -22,4 +22,4 @@ keywords = [
 nalgebra = {version="0.*", features=["debug", "compare", "rand","macros", "alloc", "arbitrary"]}
 serde_yaml = "0.8.*"
 serde = { version = "1.*", features = ["derive"] }
-castep-model-core = {path = "../castep-model-core"}
+castep-model-core = "0.2.*"
