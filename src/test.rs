@@ -10,12 +10,15 @@ mod test {
         CellModel, LatticeModel, MsiModel,
     };
     use nalgebra::Vector3;
-    use std::fs::{read_to_string, write};
+    use std::{
+        fs::{read_to_string, write},
+        str::FromStr,
+    };
 
     #[test]
     fn test_conversion() {
         let test_lat = read_to_string("SAC_GDY_Ag.msi").unwrap();
-        let msi_lat: LatticeModel<MsiModel> = LatticeModel::try_from(test_lat.as_str()).unwrap();
+        let msi_lat: LatticeModel<MsiModel> = LatticeModel::from_str(&test_lat).unwrap();
         let cell_lat: LatticeModel<CellModel> = msi_lat.into();
         let msi_back: LatticeModel<MsiModel> = cell_lat.into();
         write("SAC_GDY_Ag_back.msi", msi_back.msi_export()).unwrap();
@@ -32,10 +35,10 @@ mod test {
         seed_name: &str,
     ) {
         let test_lat = read_to_string("SAC_GDY_Ag.msi").unwrap();
-        let lat = LatticeModel::<MsiModel>::try_from(test_lat.as_str()).unwrap();
+        let lat = LatticeModel::<MsiModel>::from_str(test_lat.as_str()).unwrap();
         let test_ad = read_to_string(ads_name).unwrap();
-        let ads = LatticeModel::<MsiModel>::try_from(test_ad.as_str()).unwrap();
-        let ads_direction: Option<Vector3<f64>> = if ads.atoms().len() == 1 {
+        let ads = LatticeModel::<MsiModel>::from_str(test_ad.as_str()).unwrap();
+        let ads_direction: Option<Vector3<f64>> = if ads.atoms().size() == 1 {
             None
         } else if target_sites.len() == 1 {
             Some(lat.get_vector_ab(41_u32, 42_u32).unwrap())
