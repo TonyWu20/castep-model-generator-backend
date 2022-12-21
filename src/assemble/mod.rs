@@ -1,7 +1,7 @@
 /// Assemble adsorbate and lattice.
 use std::{f64::consts::PI, fmt::Debug, marker::PhantomData};
 
-use castep_model_core::atom::visitor::{get_multiple_xyz_by_id, get_xyz_by_id, VisitCollection};
+use castep_model_core::atom::visitor::VisitCollection;
 use na::{Point3, Translation3, Unit, UnitQuaternion, Vector3};
 
 use crate::math_helper::{
@@ -313,10 +313,12 @@ where
                 if self.coord_atom_ids().len() == 1
                     && !stem_atom_ids.contains(&self.coord_atom_ids()[0])
                 {
-                    let coord_xyz =
-                        get_xyz_by_id(self.adsorbate().atoms(), self.coord_atom_ids()[0]).unwrap();
-                    let sa_xyz = get_xyz_by_id(self.adsorbate().atoms(), stem_atom_ids[0]).unwrap();
-                    let sb_xyz = get_xyz_by_id(self.adsorbate().atoms(), stem_atom_ids[1]).unwrap();
+                    let coord_xyz = self
+                        .adsorbate()
+                        .get_xyz_by_id(self.coord_atom_ids()[0])
+                        .unwrap();
+                    let sa_xyz = self.adsorbate().get_xyz_by_id(stem_atom_ids[0]).unwrap();
+                    let sb_xyz = self.adsorbate().get_xyz_by_id(stem_atom_ids[1]).unwrap();
                     let vector =
                         perpendicular_vec_through_a_point(coord_xyz, sa_xyz, sb_xyz).unwrap();
                     if vector.z < 0.0 {
@@ -347,11 +349,11 @@ where
         if let Some(stem_atom_ids) = self.stem_atom_ids() {
             // Run into a virtual stem vector is needed
             if stem_atom_ids[0] == stem_atom_ids[1] {
-                let stem_atom_xyz =
-                    get_xyz_by_id(self.adsorbate().atoms(), stem_atom_ids[0]).unwrap();
-                let plane_atom_xyz =
-                    get_xyz_by_id(self.adsorbate().atoms(), self.plane_atom_ids().unwrap()[0])
-                        .unwrap();
+                let stem_atom_xyz = self.adsorbate().get_xyz_by_id(stem_atom_ids[0]).unwrap();
+                let plane_atom_xyz = self
+                    .adsorbate()
+                    .get_xyz_by_id(self.plane_atom_ids().unwrap()[0])
+                    .unwrap();
                 // At this case, a plane is guaranteed
                 let plane_normal = self.get_plane_normal().unwrap();
                 let stem_intersects_plane = line_plane_intersect(
@@ -378,11 +380,12 @@ where
     }
     fn get_plane_normal(&self) -> Option<Vector3<f64>> {
         self.plane_atom_ids().map(|plane_atoms| {
-            let points: Vec<&Point3<f64>> =
-                get_multiple_xyz_by_id(self.adsorbate().atoms(), plane_atoms)
-                    .into_iter()
-                    .flatten()
-                    .collect();
+            let points: Vec<&Point3<f64>> = self
+                .adsorbate()
+                .get_multiple_xyz_by_id(plane_atoms)
+                .into_iter()
+                .flatten()
+                .collect();
             let [point_1, point_2, point_3]: [&Point3<f64>; 3] = points.try_into().unwrap();
             plane_normal(point_1, point_2, point_3).unwrap()
         })
@@ -390,24 +393,22 @@ where
     fn move_to_origin(&mut self) {
         let curr_stem_centroid: Point3<f64> = if let Some(stem_atom_ids) = self.stem_atom_ids() {
             na::center(
-                get_xyz_by_id(self.adsorbate().atoms(), stem_atom_ids[0]).unwrap(),
-                get_xyz_by_id(self.adsorbate().atoms(), stem_atom_ids[1]).unwrap(),
+                self.adsorbate().get_xyz_by_id(stem_atom_ids[0]).unwrap(),
+                self.adsorbate().get_xyz_by_id(stem_atom_ids[1]).unwrap(),
             )
         } else {
-            *self.adsorbate().atoms().xyz_coords().get(0).unwrap()
+            *self.adsorbate().get_xyz_by_id(1).unwrap()
         };
         let translate_mat = Translation3::from(Point3::origin() - curr_stem_centroid);
         self.adsorbate_mut().translate(&translate_mat);
     }
     fn flip_up(&mut self, upper_atom_id: u32) {
-        let cd_atom_z = get_xyz_by_id(self.adsorbate().atoms(), self.coord_atom_ids()[0])
+        let cd_atom_z = self
+            .adsorbate()
+            .get_xyz_by_id(self.coord_atom_ids()[0])
             .unwrap()
             .z;
-        if get_xyz_by_id(self.adsorbate().atoms(), upper_atom_id)
-            .unwrap()
-            .z
-            < cd_atom_z
-        {
+        if self.adsorbate().get_xyz_by_id(upper_atom_id).unwrap().z < cd_atom_z {
             // Flip up by 180 degrees
             // The rotation axis is set to be x-axis, so this must be conducted immediately after rolling.
             let rotate_quatd = UnitQuaternion::from_axis_angle(&Vector3::x_axis(), PI);
@@ -493,11 +494,12 @@ where
 
 impl<'a, T: ModelInfo> AdsorptionBuilder<'a, T, Imported> {
     pub fn with_location_at_sites(mut self, target_sites: &[u32]) -> Self {
-        let target_sites_points: Vec<&Point3<f64>> =
-            get_multiple_xyz_by_id(self.host_lattice.atoms(), target_sites)
-                .into_iter()
-                .flatten()
-                .collect();
+        let target_sites_points: Vec<&Point3<f64>> = self
+            .host_lattice
+            .get_multiple_xyz_by_id(target_sites)
+            .into_iter()
+            .flatten()
+            .collect();
         let centroid = centroid_of_points(&target_sites_points);
         self.location = Some(centroid);
         self
@@ -545,8 +547,10 @@ where
     /// The logic for pitch do not differ on type of stem.
     fn pitch_ads(&mut self) {
         let stem_vector: Vector3<f64> = self.get_stem_vector().into();
-        let coord_atom_xyz =
-            get_xyz_by_id(self.adsorbate().atoms(), self.coord_atom_ids()[0]).unwrap();
+        let coord_atom_xyz = self
+            .adsorbate()
+            .get_xyz_by_id(self.coord_atom_ids()[0])
+            .unwrap();
         let origin_to_coord = coord_atom_xyz - Point3::origin();
         // Compute dot product of `stem_vector` and `origin_to_coord` to see if they are in same x-direction
         let stem_dot_oc = origin_to_coord.dot(&stem_vector);
@@ -675,7 +679,7 @@ impl<'a, T: ModelInfo> AdsorptionBuilder<'a, T, Calibrated> {
         let ads = self.adsorbate();
         let location = self.location();
         let coord_atom_id = self.coord_atom_ids()[0];
-        let coord_atom_point = get_xyz_by_id(ads.atoms(), coord_atom_id).unwrap();
+        let coord_atom_point = ads.get_xyz_by_id(coord_atom_id).unwrap();
         let vertical_proj_from_coord_atom = Vector3::new(0.0, 0.0, self.bond_length());
         // Create a stem_vector guaranteed to be pointing upwards
         let stem_vector: Vector3<f64> = self.get_coord_stem_vector();
@@ -709,7 +713,7 @@ impl<'a, T: ModelInfo> AdsorptionBuilder<'a, T, Calibrated> {
             let coord_atom_points: Vec<&Point3<f64>> = self
                 .coord_atom_ids()
                 .iter()
-                .map(|&coord_id| get_xyz_by_id(ads.atoms(), coord_id).unwrap())
+                .map(|&coord_id| ads.get_xyz_by_id(coord_id).unwrap())
                 .collect();
             let coord_centroid = centroid_of_points(&coord_atom_points);
             location.z += self.bond_length();
