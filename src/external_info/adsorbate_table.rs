@@ -10,7 +10,8 @@ use super::YamlTable;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct AdsTab {
-    directory: String,
+    source_directory: String,
+    target_directory: Option<String>,
     #[serde(rename = "Adsorbates")]
     adsorbates: Option<Vec<AdsInfo>>,
 }
@@ -20,8 +21,12 @@ impl AdsTab {
         self.adsorbates.as_ref()
     }
 
-    pub fn directory(&self) -> &str {
-        self.directory.as_ref()
+    pub fn source_directory(&self) -> &str {
+        self.source_directory.as_ref()
+    }
+
+    pub fn target_directory(&self) -> Option<&String> {
+        self.target_directory.as_ref()
     }
 }
 
