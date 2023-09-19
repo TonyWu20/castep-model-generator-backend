@@ -1,4 +1,6 @@
+use castep_model_core::{LatticeModel, ModelInfo};
 use serde::{Deserialize, Serialize};
+use std::marker::PhantomData;
 
 /**
 When defining your custom adsorbate struct, it is suggested to doing like this:
@@ -11,7 +13,30 @@ pub struct MyAdsorbate<T> {
 impl<T> Adsorbate for MyAdsorbate<T>{}
 ```
 */
-pub trait Adsorbate {}
+
+pub struct Single;
+pub struct Double;
+pub struct Multi;
+
+pub trait AtomNum {}
+pub trait CoordNum {}
+pub trait Pathway {}
+
+impl AtomNum for Single {}
+impl AtomNum for Double {}
+impl AtomNum for Multi {}
+impl CoordNum for Single {}
+impl CoordNum for Double {}
+impl CoordNum for Multi {}
+
+#[derive(Debug)]
+pub struct Adsorbate<T: ModelInfo, P: Pathway, M: AtomNum, N: CoordNum> {
+    lattice_model: LatticeModel<T>,
+    ads_info: AdsInfo,
+    pathway: PhantomData<P>,
+    atom_num: PhantomData<M>,
+    coord_num: PhantomData<N>,
+}
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct AdsInfo {

@@ -13,6 +13,8 @@ use castep_core::{
     LatticeModel, ModelInfo, Transformation,
 };
 
+pub mod logic;
+
 pub trait BuilderState {}
 pub trait ParamSetState {}
 
